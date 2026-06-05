@@ -103,7 +103,12 @@ def phase2_render(video_frames, tracks, cam_move,
         2: tuple(int(c) for c in team_assigner.team_colors[2]),
     }
 
-    output_frames = []
+    os.makedirs('output_videos', exist_ok=True)
+    h, w = video_frames[0].shape[:2]
+    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+    out_writer = cv2.VideoWriter(
+        'output_videos/output_enhanced.avi', fourcc, 30, (w, h))
+
     annotated = tracker.draw_annotations(
         video_frames, tracks, team_ball_control)
     annotated = cam_est.draw_camera_movement(annotated, cam_move)
@@ -121,10 +126,9 @@ def phase2_render(video_frames, tracks, cam_move,
             tracks, frame_num, team_colors=team_colors)
         frame = minimap_renderer.overlay(
             frame, minimap, pos='bottom_right')
-        output_frames.append(frame)
+        out_writer.write(frame)
 
-    os.makedirs('output_videos', exist_ok=True)
-    save_video(output_frames, 'output_videos/output_enhanced.avi')
+    out_writer.release()
     print("Saved: output_videos/output_enhanced.avi")
 
     cv2.imwrite('output_videos/heatmap_both.png',
