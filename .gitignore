@@ -13,6 +13,9 @@ venv/
 datasets/
 
 # Models (large, trained weights)
+*.pt
+*.pth
+*.engine
 models/**/*.pt
 models/**/*.pth
 models/**/*.engine
