@@ -13,6 +13,7 @@ from estimators import (CameraMovementEstimator,
 from pitch_keypoint_detector.pitch_keypoint_detector import PitchKeypointDetector
 from heatmap_generator.heatmap_generator import HeatmapGenerator
 from minimap.minimap_renderer import MinimapRenderer
+from formations import detect_team_formation
 
 
 STUB_DIR = 'stubs'
@@ -105,6 +106,15 @@ def phase2_render(video_frames, tracks, cam_move,
     }
 
     os.makedirs('output_videos', exist_ok=True)
+
+    # Detect formations
+    f1, n1, c1 = detect_team_formation(
+        tracks, 1, frame_nums=range(0, total, 30), method='kmeans')
+    f2, n2, c2 = detect_team_formation(
+        tracks, 2, frame_nums=range(0, total, 30), method='kmeans')
+    print(f"Team 1 formation: {n1} (conf={c1:.0%})")
+    print(f"Team 2 formation: {n2} (conf={c2:.0%})")
+
     h, w = video_frames[0].shape[:2]
     fourcc = cv2.VideoWriter_fourcc(*'MJPG')
     out_writer = cv2.VideoWriter(
@@ -156,6 +166,12 @@ def phase2_render(video_frames, tracks, cam_move,
                     (w-530, h-80), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), 3)
         cv2.putText(frame, f"Team 2: {team2_ct/bc_total*100:.0f}%",
                     (w-530, h-50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
+
+        # formation overlay
+        cv2.putText(frame, f"Team 1: {n1}", (10, h-80),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,0,0), 2)
+        cv2.putText(frame, f"Team 2: {n2}", (10, h-50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2)
 
         # keypoints + minimap
         kps = kp_detector.detect_smoothed(video_frames[frame_num])
