@@ -65,11 +65,13 @@ class Tracker:
 
             # ByteTrack
             det_with_tracks = self.tracker.update_with_detections(det_sv)
+            if det_with_tracks.tracker_id is None:
+                continue
 
-            for fd in det_with_tracks:
-                bbox     = fd[0].tolist()
-                cls_id   = fd[3]
-                track_id = fd[4]
+            for i in range(len(det_with_tracks)):
+                bbox     = det_with_tracks.xyxy[i].tolist()
+                cls_id   = det_with_tracks.class_id[i]
+                track_id = det_with_tracks.tracker_id[i]
                 name     = cls_names[cls_id]
 
                 if name == "player":
@@ -78,11 +80,10 @@ class Tracker:
                     tracks["referees"][frame_num][track_id] = {"bbox": bbox}
 
             # Ball — không track, lấy detection conf cao nhất
-            for fd in det_sv:
-                bbox   = fd[0].tolist()
-                cls_id = fd[3]
-                if cls_names[cls_id] == "ball":
-                    tracks["ball"][frame_num][1] = {"bbox": bbox}
+            ball_boxes = det_sv.xyxy[det_sv.class_id == cls_names_inv["ball"]]
+            if len(ball_boxes) > 0:
+                bbox = ball_boxes[0].tolist()
+                tracks["ball"][frame_num][1] = {"bbox": bbox}
 
         if stub_path:
             os.makedirs(os.path.dirname(stub_path), exist_ok=True)
