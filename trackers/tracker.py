@@ -64,7 +64,18 @@ class Tracker:
                     det_sv.class_id[i] = cls_names_inv["player"]
 
             # ByteTrack
+            if frame_num == 0:
+                print(f"det_sv type={type(det_sv)} len={len(det_sv)}")
+                print(f"  xyxy shape={det_sv.xyxy.shape if hasattr(det_sv.xyxy, 'shape') else 'N/A'}")
+                print(f"  confidence={det_sv.confidence}")
+                print(f"  class_id={det_sv.class_id}")
+                print(f"  tracker_id={det_sv.tracker_id}")
             det_with_tracks = self.tracker.update_with_detections(det_sv)
+            if frame_num == 0:
+                print(f"after track: type={type(det_with_tracks)} len={len(det_with_tracks)}")
+                print(f"  tracker_id={det_with_tracks.tracker_id}")
+                if det_with_tracks.tracker_id is not None:
+                    print(f"  tracker_id values={det_with_tracks.tracker_id}")
             if det_with_tracks.tracker_id is None:
                 continue
 
