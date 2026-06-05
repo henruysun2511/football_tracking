@@ -109,16 +109,54 @@ def phase2_render(video_frames, tracks, cam_move,
     out_writer = cv2.VideoWriter(
         'output_videos/output_enhanced.avi', fourcc, 30, (w, h))
 
-    annotated = tracker.draw_annotations(
-        video_frames, tracks, team_ball_control)
-    annotated = cam_est.draw_camera_movement(annotated, cam_move)
-    sde.draw_speed_and_distance(annotated, tracks)
-
-    total = len(annotated)
-    for frame_num, frame in enumerate(annotated):
+    total = len(video_frames)
+    for frame_num in range(total):
         if frame_num % 30 == 0:
             print(f"Rendering frame {frame_num}/{total}...")
-        frame = frame.copy()
+        frame = video_frames[frame_num].copy()
+
+        # draw annotations (inline để không tạo list trung gian)
+        for tid, data in tracks["players"][frame_num].items():
+            color = data.get("team_color", (0,255,0))
+            frame = tracker.draw_ellipse(frame, data["bbox"], color, tid)
+            if data.get("has_ball"):
+                frame = tracker.draw_triangle(frame, data["bbox"], (0,255,0))
+        for tid, data in tracks["referees"][frame_num].items():
+            frame = tracker.draw_ellipse(frame, data["bbox"], (255,255,0), tid)
+        if 1 in tracks["ball"][frame_num]:
+            frame = tracker.draw_triangle(frame,
+                tracks["ball"][frame_num][1]["bbox"], (0,255,255))
+
+        # camera movement
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (0,0), (500,100), (255,255,255), -1)
+        cv2.addWeighted(overlay, 0.2, frame, 0.8, 0, frame)
+        dx, dy = cam_move[frame_num]
+        cv2.putText(frame, "Camera Movement", (10,30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 3)
+        cv2.putText(frame, f"X: {dx:.1f}  Y: {dy:.1f}", (10,70),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 3)
+
+        # speed / distance
+        for tid, data in tracks["players"][frame_num].items():
+            spd = data.get("speed")
+            dist = data.get("distance")
+            if spd is not None:
+                x_c = int((data["bbox"][0]+data["bbox"][2])/2)
+                y_b = int(data["bbox"][3])
+                cv2.putText(frame, f"{spd:.1f}", (x_c-20, y_b-30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+
+        # team ball control
+        team1_ct = np.sum(team_ball_control[:frame_num+1] == 1)
+        team2_ct = np.sum(team_ball_control[:frame_num+1] == 2)
+        bc_total = team1_ct + team2_ct + 1e-6
+        cv2.putText(frame, f"Team 1: {team1_ct/bc_total*100:.0f}%",
+                    (w-530, h-80), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), 3)
+        cv2.putText(frame, f"Team 2: {team2_ct/bc_total*100:.0f}%",
+                    (w-530, h-50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
+
+        # keypoints + minimap
         kps = kp_detector.detect_smoothed(video_frames[frame_num])
         if kps is not None:
             frame = kp_detector.draw_keypoints(frame, kps)
@@ -126,6 +164,7 @@ def phase2_render(video_frames, tracks, cam_move,
             tracks, frame_num, team_colors=team_colors)
         frame = minimap_renderer.overlay(
             frame, minimap, pos='bottom_right')
+
         out_writer.write(frame)
 
     out_writer.release()
