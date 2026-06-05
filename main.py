@@ -88,9 +88,8 @@ def phase2_render(video_frames, tracks, cam_move,
               f"VRAM free: {torch.cuda.mem_get_info()[0]/1024**3:.1f}GB")
     else:
         print("WARNING: No GPU detected, running on CPU")
-    tracker = Tracker()  # no model needed — only drawing
+    tracker = Tracker()
     cam_est = CameraMovementEstimator(video_frames[0])
-    sde = SpeedDistanceEstimator()
 
     kp_detector = PitchKeypointDetector(
         model_path='models/old/pitch_keypoint_detector.pt')
