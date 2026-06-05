@@ -29,6 +29,7 @@ class Tracker:
                 return pickle.load(f)
 
         detections = self.detect_frames(frames)
+        print(f"DEBUG: {len(detections)} detection results from {len(frames)} frames")
 
         tracks = {
             "players":  [],
@@ -37,6 +38,12 @@ class Tracker:
         }
 
         for frame_num, detection in enumerate(detections):
+            if frame_num == 0:
+                print(f"DEBUG frame 0: type={type(detection)}")
+                try:
+                    print(f"  boxes={len(detection.boxes)} obb={hasattr(detection, 'obb')}")
+                except:
+                    print("  no boxes attr")
             cls_names     = detection.names
             cls_names_inv = {v: k for k, v in cls_names.items()}
 
@@ -47,6 +54,14 @@ class Tracker:
                     det_sv.class_id[i] = cls_names_inv["player"]
 
             det_with_tracks = self.tracker.update_with_detections(det_sv)
+
+            if frame_num == 0:
+                print(f"DEBUG ByteTrack: type={type(det_with_tracks)} len={len(det_with_tracks)}")
+                if len(det_with_tracks) > 0:
+                    first = det_with_tracks[0]
+                    print(f"  first item type={type(first)} len={len(first)} items={first}")
+                else:
+                    print(f"  EMPTY! det_sv had {len(det_sv)} objects")
 
             tracks["players"].append({})
             tracks["referees"].append({})
