@@ -1,6 +1,12 @@
 import numpy as np
 from collections import Counter
 
+try:
+    from sklearn.cluster import KMeans
+    _HAS_SKLEARN = True
+except ImportError:
+    _HAS_SKLEARN = False
+
 
 KNOWN_FORMATIONS = {
     (4, 4, 2): "4-4-2",
@@ -69,15 +75,12 @@ def detect_formation(positions, pitch_length=12000, method='kmeans'):
 
 
 def _cluster_lines_kmeans(xs, n_clusters=3):
-    """Simple 1D k-means clustering."""
-    from sklearn.cluster import KMeans
-    # Fallback if sklearn not available
-    try:
+    """1D k-means clustering for line detection."""
+    if _HAS_SKLEARN:
         km = KMeans(n_clusters=n_clusters, random_state=0, n_init=5)
         labels = km.fit_predict(xs.reshape(-1, 1))
         return labels, km.cluster_centers_.flatten()
-    except ImportError:
-        return _cluster_lines_simple(xs, n_clusters)
+    return _cluster_lines_simple(xs, n_clusters)
 
 
 def _cluster_lines_simple(xs, n_clusters=3):
