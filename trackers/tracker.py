@@ -1,100 +1,73 @@
-import warnings
-warnings.filterwarnings("ignore", message=".*ByteTrack.*deprecated.*")
-
-import os
-import cv2
-import numpy as np
-import pandas as pd
-import pickle
 from ultralytics import YOLO
 import supervision as sv
+import pickle
+import os
+import numpy as np
+import pandas as pd
+import cv2
 
 
 class Tracker:
     def __init__(self, model_path):
         self.model   = YOLO(model_path)
-        self.tracker = sv.ByteTrack(track_activation_threshold=0.1)
+        self.tracker = sv.ByteTrack()
 
     # ── Detection ────────────────────────────────────────────
     def detect_frames(self, frames, batch_size=20):
-        import torch
         detections = []
-        kwargs = dict(conf=0.1, device='cpu')
-        if torch.cuda.is_available():
-            free, total = torch.cuda.mem_get_info()
-            free_gb = free / 1024**3
-            if free_gb > 1.0:
-                kwargs['device'] = 0
-                if total / 1024**3 <= 4:
-                    kwargs['half'] = True
         for i in range(0, len(frames), batch_size):
             batch = frames[i:i+batch_size]
-            results = self.model.predict(batch, **kwargs)
+            results = self.model.predict(batch, conf=0.1)
             detections.extend(results)
         return detections
 
     # ── Tracking ─────────────────────────────────────────────
     def get_object_tracks(self, frames,
                           read_from_stub=False, stub_path=None):
-        if read_from_stub and stub_path:
-            try:
-                with open(stub_path, 'rb') as f:
-                    return pickle.load(f)
-            except FileNotFoundError:
-                pass
+        if read_from_stub and stub_path and os.path.exists(stub_path):
+            with open(stub_path, 'rb') as f:
+                return pickle.load(f)
 
         detections = self.detect_frames(frames)
 
         tracks = {
-            "players":  [{} for _ in frames],
-            "referees": [{} for _ in frames],
-            "ball":     [{} for _ in frames],
+            "players":  [],
+            "referees": [],
+            "ball":     [],
         }
 
         for frame_num, detection in enumerate(detections):
-            cls_names     = detection.names           # {id: name}
+            cls_names     = detection.names
             cls_names_inv = {v: k for k, v in cls_names.items()}
 
-            # Supervision detection object
             det_sv = sv.Detections.from_ultralytics(detection)
 
-            # Goalkeeper → player (merge class)
             for i, class_id in enumerate(det_sv.class_id):
                 if cls_names[class_id] == "goalkeeper":
                     det_sv.class_id[i] = cls_names_inv["player"]
 
-            # ByteTrack
-            if frame_num == 0:
-                print(f"det_sv type={type(det_sv)} len={len(det_sv)}")
-                print(f"  xyxy shape={det_sv.xyxy.shape if hasattr(det_sv.xyxy, 'shape') else 'N/A'}")
-                print(f"  confidence={det_sv.confidence}")
-                print(f"  class_id={det_sv.class_id}")
-                print(f"  tracker_id={det_sv.tracker_id}")
             det_with_tracks = self.tracker.update_with_detections(det_sv)
-            if frame_num == 0:
-                print(f"after track: type={type(det_with_tracks)} len={len(det_with_tracks)}")
-                print(f"  tracker_id={det_with_tracks.tracker_id}")
-                if det_with_tracks.tracker_id is not None:
-                    print(f"  tracker_id values={det_with_tracks.tracker_id}")
-            if det_with_tracks.tracker_id is None:
-                continue
 
-            for i in range(len(det_with_tracks)):
-                bbox     = det_with_tracks.xyxy[i].tolist()
-                cls_id   = det_with_tracks.class_id[i]
-                track_id = det_with_tracks.tracker_id[i]
-                name     = cls_names[cls_id]
+            tracks["players"].append({})
+            tracks["referees"].append({})
+            tracks["ball"].append({})
 
-                if name == "player":
+            for frame_detection in det_with_tracks:
+                bbox     = frame_detection[0].tolist()
+                cls_id   = frame_detection[3]
+                track_id = frame_detection[4]
+
+                if cls_id == cls_names_inv['player']:
                     tracks["players"][frame_num][track_id] = {"bbox": bbox}
-                elif name == "referee":
+                if cls_id == cls_names_inv['referee']:
                     tracks["referees"][frame_num][track_id] = {"bbox": bbox}
 
-            # Ball — không track, lấy detection conf cao nhất
-            ball_boxes = det_sv.xyxy[det_sv.class_id == cls_names_inv["ball"]]
-            if len(ball_boxes) > 0:
-                bbox = ball_boxes[0].tolist()
-                tracks["ball"][frame_num][1] = {"bbox": bbox}
+            for frame_detection in det_sv:
+                bbox   = frame_detection[0].tolist()
+                cls_id = frame_detection[3]
+
+                if cls_id == cls_names_inv['ball']:
+                    tracks["ball"][frame_num][1] = {"bbox": bbox}
 
         if stub_path:
             os.makedirs(os.path.dirname(stub_path), exist_ok=True)
