@@ -81,6 +81,7 @@ def phase1_tracking():
 
 def phase2_render(video_frames, tracks, cam_move,
                   team_ball_control, team_assigner):
+    print("Phase 2: Rendering...")
     tracker = Tracker('models/player_detector.pt')
     cam_est = CameraMovementEstimator(video_frames[0])
     sde = SpeedDistanceEstimator()
@@ -102,7 +103,10 @@ def phase2_render(video_frames, tracks, cam_move,
     annotated = cam_est.draw_camera_movement(annotated, cam_move)
     sde.draw_speed_and_distance(annotated, tracks)
 
+    total = len(annotated)
     for frame_num, frame in enumerate(annotated):
+        if frame_num % 30 == 0:
+            print(f"Rendering frame {frame_num}/{total}...")
         frame = frame.copy()
         kps = kp_detector.detect_smoothed(video_frames[frame_num])
         if kps is not None:
