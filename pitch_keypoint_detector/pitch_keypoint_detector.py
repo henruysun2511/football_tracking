@@ -60,14 +60,19 @@ class PitchKeypointDetector:
     def __init__(self, model_path='models/pitch_keypoint.pt',
                  conf_threshold=0.3):
         self.model = YOLO(model_path)
+        import torch
+        self.device = 0 if torch.cuda.is_available() else 'cpu'
+        if self.device != 'cpu':
+            self.model.to('cuda')
+            print(f"PitchKeypointDetector: using GPU")
+        else:
+            print("PitchKeypointDetector: using CPU")
         self.conf = conf_threshold
         self.config = SoccerPitchConfig()
         self.prev_keypoints = None
 
     def detect(self, frame):
-        import torch
-        device = 0 if torch.cuda.is_available() else 'cpu'
-        results = self.model(frame, conf=self.conf, verbose=False, device=device)
+        results = self.model(frame, conf=self.conf, verbose=False, device=self.device)
         kps = results[0].keypoints
         if kps is None or len(kps.data) == 0:
             return None

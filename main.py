@@ -82,6 +82,12 @@ def phase1_tracking():
 def phase2_render(video_frames, tracks, cam_move,
                   team_ball_control, team_assigner):
     print("Phase 2: Rendering...")
+    import torch
+    if torch.cuda.is_available():
+        print(f"GPU: {torch.cuda.get_device_name(0)} "
+              f"VRAM free: {torch.cuda.mem_get_info()[0]/1024**3:.1f}GB")
+    else:
+        print("WARNING: No GPU detected, running on CPU")
     tracker = Tracker()  # no model needed — only drawing
     cam_est = CameraMovementEstimator(video_frames[0])
     sde = SpeedDistanceEstimator()

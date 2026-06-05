@@ -18,6 +18,10 @@ class Tracker:
             raise RuntimeError("Tracker created without model_path")
         import torch
         device = 0 if torch.cuda.is_available() else 'cpu'
+        if device == 0 and torch.cuda.mem_get_info()[0] < 1*1024**3:
+            device = 'cpu'
+        if device == 0:
+            self.model.to('cuda')
         detections = []
         for i in range(0, len(frames), batch_size):
             batch = frames[i:i+batch_size]
