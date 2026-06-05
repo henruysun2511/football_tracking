@@ -8,22 +8,28 @@ import cv2
 
 
 class Tracker:
-    def __init__(self, model_path):
-        self.model   = YOLO(model_path)
-        self.tracker = sv.ByteTrack()
+    def __init__(self, model_path=None):
+        self.model   = YOLO(model_path) if model_path else None
+        self.tracker = sv.ByteTrack() if model_path else None
 
     # ── Detection ────────────────────────────────────────────
     def detect_frames(self, frames, batch_size=20):
+        if self.model is None:
+            raise RuntimeError("Tracker created without model_path")
+        import torch
+        device = 0 if torch.cuda.is_available() else 'cpu'
         detections = []
         for i in range(0, len(frames), batch_size):
             batch = frames[i:i+batch_size]
-            results = self.model.predict(batch, conf=0.1)
+            results = self.model.predict(batch, conf=0.1, device=device)
             detections.extend(results)
         return detections
 
     # ── Tracking ─────────────────────────────────────────────
     def get_object_tracks(self, frames,
                           read_from_stub=False, stub_path=None):
+        if self.model is None:
+            raise RuntimeError("Tracker created without model_path")
         if read_from_stub and stub_path and os.path.exists(stub_path):
             with open(stub_path, 'rb') as f:
                 return pickle.load(f)

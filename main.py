@@ -82,7 +82,7 @@ def phase1_tracking():
 def phase2_render(video_frames, tracks, cam_move,
                   team_ball_control, team_assigner):
     print("Phase 2: Rendering...")
-    tracker = Tracker('models/player_detector.pt')
+    tracker = Tracker()  # no model needed — only drawing
     cam_est = CameraMovementEstimator(video_frames[0])
     sde = SpeedDistanceEstimator()
 
