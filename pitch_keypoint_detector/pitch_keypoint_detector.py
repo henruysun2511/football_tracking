@@ -76,7 +76,7 @@ class PitchKeypointDetector:
         kps = results[0].keypoints
         if kps is None or len(kps.data) == 0:
             return None
-        xy = kps.data[0].cpu().numpy()
+        xy = kps.data[0][:, :2].cpu().numpy()
         confs = kps.conf[0].cpu().numpy() if kps.conf is not None else np.ones(len(xy))
         return xy, confs
 
