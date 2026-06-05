@@ -13,7 +13,7 @@ import supervision as sv
 class Tracker:
     def __init__(self, model_path):
         self.model   = YOLO(model_path)
-        self.tracker = sv.ByteTrack()
+        self.tracker = sv.ByteTrack(track_activation_threshold=0.1)
 
     # ── Detection ────────────────────────────────────────────
     def detect_frames(self, frames, batch_size=20):
