@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+.env
+
+# Datasets (large, downloaded)
+datasets/
+
+# Models (large, trained weights)
+models/**/*.pt
+models/**/*.pth
+models/**/*.engine
+
+# Outputs
+output_videos/
+runs/
+test_output/
+
+# Cache / Stubs (generated)
+stubs/
+cache/
+cache_gradio/
+
+# Input videos (user-provided, large)
+input_videos/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
