@@ -169,4 +169,4 @@ if __name__ == "__main__":
         mod in sys.modules for mod in
         ["google.colab", "kaggle"])
     demo.launch(share=is_notebook or "KAGGLE_KERNEL_RUN_TYPE" in os.environ,
-                server_port=7860)
+                server_port=7861)
