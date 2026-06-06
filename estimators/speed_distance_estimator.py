@@ -2,20 +2,20 @@ import cv2
 import numpy as np
 from utils import measure_distance
 
-# Config units: SoccerPitchConfig dùng cm (length=12000, width=7000)
-# → position_transformed đơn vị là cm
-# → dist từ measure_distance cũng là cm
-_UNIT_TO_METER = 0.01   # 1 cm = 0.01 m
+# SoccerPitchConfig: length=12000, width=7000 → đơn vị cm
+_UNIT_TO_METER = 0.01   # cm → m
 
-# Giới hạn sinh lý học cầu thủ bóng đá
-_MAX_SPEED_KMH  = 42.0  # Kylian Mbappé ~38 km/h, buffer an toàn
-_MAX_DIST_JUMP  = 15.0  # Tối đa 15m trong 1 window (5 frame @ 24fps ≈ 0.21s)
+# Giới hạn sinh lý học
+_MAX_SPEED_KMH = 38.0   # Mbappé ~38 km/h
+# Max distance trong 1 window = WINDOW/fps giây
+# WINDOW=5, fps=25 → 0.2s → max 12m/s × 0.2s = 2.4m = 240cm, dùng 300cm buffer
+_MAX_DIST_CM = 300.0
 
 
 class SpeedDistanceEstimator:
     WINDOW = 5
 
-    def add_speed_and_distance_to_tracks(self, tracks, fps=24):
+    def add_speed_and_distance_to_tracks(self, tracks, fps=25):
         total_dist = {}
         for obj, obj_tracks in tracks.items():
             if obj in ('ball', 'referees'):
@@ -41,16 +41,13 @@ class SpeedDistanceEstimator:
                         continue
 
                     dist_cm = measure_distance(p_start, p_end)
-                    dist_m  = dist_cm * _UNIT_TO_METER
 
-                    # Sanity check: reject nếu distance phi thực tế
-                    if dist_m > _MAX_DIST_JUMP:
+                    # Reject window phi thực tế
+                    if dist_cm > _MAX_DIST_CM:
                         continue
 
+                    dist_m   = dist_cm * _UNIT_TO_METER
                     elapsed  = (end - start) / fps
-                    if elapsed <= 0:
-                        continue
-
                     speed_ms = dist_m / elapsed
                     speed_kh = min(speed_ms * 3.6, _MAX_SPEED_KMH)
 
