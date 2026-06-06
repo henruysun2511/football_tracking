@@ -191,7 +191,7 @@ def visualize_before_after(split="train", n_samples=6):
     plt.savefig("analysis/figures/data_cleaning_comparison.png",
                 dpi=150, bbox_inches='tight')
     plt.show()
-    print("✅ Saved: analysis/figures/data_cleaning_comparison.png")
+    print("Saved: analysis/figures/data_cleaning_comparison.png")
 
 
 # ── BƯỚC 5: BÁO CÁO TỔNG KẾT ────────────────────────────────
@@ -215,7 +215,7 @@ def print_cleaning_report(before_stats, after_counts):
 # ── MAIN ─────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("🔍 Bước 1: Scan dataset gốc...")
+    print("Buoc 1: Scan dataset goc...")
     all_before = {}
     all_bad    = {}
     for split in SPLITS:
@@ -229,19 +229,19 @@ if __name__ == "__main__":
               f"empty={stats['empty_label']} "
               f"invalid_bbox={stats['invalid_bbox']}")
 
-    print("\n🧹 Bước 2: Copy ảnh sạch...")
+    print("\nBuoc 2: Copy anh sach...")
     after_counts = {}
     for split in SPLITS:
         clean_split(split, all_bad[split])
         after_dir = Path(CLEANED_ROOT) / split / "images"
         after_counts[split] = len(list(after_dir.glob("*.jpg")))
 
-    print("\n🔧 Bước 3: Fix bbox out-of-bounds...")
+    print("\nBuoc 3: Fix bbox out-of-bounds...")
     for split in SPLITS:
         fix_bbox_labels(split)
 
-    print("\n📊 Bước 4: Visualize trước/sau...")
+    print("\nBuoc 4: Visualize truoc/sau...")
     visualize_before_after("train")
 
     print_cleaning_report(all_before, after_counts)
-    print("\n✅ Dataset sạch đã lưu tại:", CLEANED_ROOT)
+    print("\nDataset sach da luu tai:", CLEANED_ROOT)

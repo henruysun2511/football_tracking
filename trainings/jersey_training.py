@@ -9,7 +9,7 @@ def main():
     load_dotenv()
     api_key = os.getenv("ROBOFLOW_API_KEY")
 
-    dataset_dir = "datasets/football-shirt-number-1"
+    dataset_dir = "datasets/football-shirt-number-cleaned"
     yaml_path = Path(os.getcwd()) / dataset_dir / "data.yaml"
 
     if not yaml_path.exists():

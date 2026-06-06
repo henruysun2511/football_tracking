@@ -14,6 +14,7 @@ from pitch_keypoint_detector.pitch_keypoint_detector import PitchKeypointDetecto
 from heatmap_generator.heatmap_generator import HeatmapGenerator
 from minimap.minimap_renderer import MinimapRenderer
 from formations import detect_team_formation
+from ocr import read_jersey_number, draw_jersey_number
 
 
 STUB_DIR = 'stubs'
@@ -115,6 +116,9 @@ def phase2_render(video_frames, tracks, cam_move,
     print(f"Team 1 formation: {n1} (conf={c1:.0%})")
     print(f"Team 2 formation: {n2} (conf={c2:.0%})")
 
+    jersey_cache = {}
+    print("Jersey OCR ready (lazy init on first use)")
+
     h, w = video_frames[0].shape[:2]
     fourcc = cv2.VideoWriter_fourcc(*'MJPG')
     out_writer = cv2.VideoWriter(
@@ -132,6 +136,16 @@ def phase2_render(video_frames, tracks, cam_move,
             frame = tracker.draw_ellipse(frame, data["bbox"], color, tid)
             if data.get("has_ball"):
                 frame = tracker.draw_triangle(frame, data["bbox"], (0,255,0))
+            # Jersey number OCR (lazy, cached per track_id)
+            if tid not in jersey_cache:
+                num = read_jersey_number(
+                    video_frames[frame_num], data['bbox'],
+                    cache=jersey_cache, track_id=tid)
+                if num is not None:
+                    jersey_cache[tid] = num
+            if tid in jersey_cache:
+                draw_jersey_number(
+                    frame, data['bbox'], jersey_cache[tid], tid)
         for tid, data in tracks["referees"][frame_num].items():
             frame = tracker.draw_ellipse(frame, data["bbox"], (255,255,0), tid)
         if 1 in tracks["ball"][frame_num]:
