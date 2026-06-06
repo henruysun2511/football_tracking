@@ -107,7 +107,7 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
             progress(0.7 + 0.25 * fn / total)
 
     progress(0.95, desc="Saving output...")
-    # CHÚ Ý: Đổi hẳn định dạng lưu file sang .mp4 công khai tương thích trình duyệt
+    # Lưu dưới dạng .mp4 chuẩn để web hiển thị trực tiếp được luôn
     out_path = str(CACHE_DIR / f"{stub_key}_output.mp4")
     save_video(out_frames, out_path)
 
@@ -132,7 +132,6 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
 def video_ui(file, show_kp, show_mm, show_hm, progress=gr.Progress()):
     if file is None:
         return None, gr.update(visible=False)
-    # CHÚ Ý: Bỏ thuộc tính .name để tương thích với cấu trúc string path mới
     video_path = file
     out_vid, hm_paths = process_video(
         video_path, show_kp, show_mm, show_hm, progress)
@@ -155,7 +154,6 @@ with gr.Blocks(title="Football AI Analysis", css="""
                 show_hm = gr.Checkbox(label="Heatmap", value=False)
             btn = gr.Button("Analyze", variant="primary")
         with gr.Column(scale=2):
-            # CHÚ Ý: Đồng bộ format sang mp4 để trình duyệt hiển thị trực tiếp thanh Playback
             video_output = gr.Video(label="Result", format="mp4")
             heatmap_gallery = gr.Gallery(label="Heatmaps", columns=3,
                                          visible=False)
