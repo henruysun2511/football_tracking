@@ -6,14 +6,16 @@ import pickle
 
 class CameraMovementEstimator:
     def __init__(self, first_frame):
+        self.minimum_distance = 5
+
         self.lk_params = dict(
             winSize=(15,15), maxLevel=2,
             criteria=(cv2.TERM_CRITERIA_EPS|cv2.TERM_CRITERIA_COUNT,
                       10, 0.03))
         h, w = first_frame.shape[:2]
         mask = np.zeros((h, w), dtype=np.uint8)
-        mask[:40, :]  = 255
-        mask[-40:, :] = 255
+        mask[:, :20] = 1
+        mask[:, -150:] = 1
         self.features = dict(maxCorners=100, qualityLevel=0.3,
                              minDistance=3, blockSize=7, mask=mask)
         self.gray_prev = cv2.cvtColor(first_frame,
@@ -43,19 +45,24 @@ class CameraMovementEstimator:
             new_pts, st, _ = cv2.calcOpticalFlowPyrLK(
                 old_gray, gray, old_pts, None, **self.lk_params)
 
-            max_dx = max_dy = 0
+            max_distance = 0
+            dx = dy = 0
             for old, new, s in zip(old_pts, new_pts, st):
                 if s[0] == 1:
-                    dx = abs(new[0][0] - old[0][0])
-                    dy = abs(new[0][1] - old[0][1])
-                    if dx > max_dx:
-                        max_dx = dx
-                    if dy > max_dy:
-                        max_dy = dy
-            movement.append([max_dx, max_dy])
+                    ox, oy = old.ravel()
+                    nx, ny = new.ravel()
+                    dist = ((nx - ox)**2 + (ny - oy)**2) ** 0.5
+                    if dist > max_distance:
+                        max_distance = dist
+                        dx = nx - ox
+                        dy = ny - oy
+            if max_distance > self.minimum_distance:
+                movement.append([dx, dy])
+                old_pts = cv2.goodFeaturesToTrack(gray, **self.features)
+            else:
+                movement.append([0, 0])
 
             old_gray = gray
-            old_pts  = cv2.goodFeaturesToTrack(gray, **self.features)
 
         if stub_path:
             os.makedirs(os.path.dirname(stub_path), exist_ok=True)
