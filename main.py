@@ -162,15 +162,25 @@ def phase2_render(video_frames, tracks, cam_move,
         cv2.putText(frame, f"X: {dx:.1f}  Y: {dy:.1f}", (10,70),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 3)
 
-        # speed / distance
+        # speed / distance (below foot — reference style)
         for tid, data in tracks["players"][frame_num].items():
             spd = data.get("speed")
-            dist = data.get("distance")
-            if spd is not None:
-                x_c = int((data["bbox"][0]+data["bbox"][2])/2)
-                y_b = int(data["bbox"][3])
-                cv2.putText(frame, f"{spd:.1f}", (x_c-20, y_b-30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+            dst = data.get("distance")
+            bbox = data.get("bbox")
+            if spd is None or bbox is None:
+                continue
+            x1, _, x2, y2 = map(int, bbox)
+            foot_x = (x1 + x2) // 2
+            foot_y = y2
+            cv2.putText(frame, f"{spd:.2f} km/h",
+                        (foot_x, foot_y + 40),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5, (0, 0, 0), 2)
+            if dst is not None:
+                cv2.putText(frame, f"{dst:.2f} m",
+                            (foot_x, foot_y + 60),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5, (0, 0, 0), 2)
 
         # team ball control
         team1_ct = np.sum(team_ball_control[:frame_num+1] == 1)

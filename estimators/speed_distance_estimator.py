@@ -10,7 +10,7 @@ class SpeedDistanceEstimator:
     def add_speed_and_distance_to_tracks(self, tracks):
         total_dist = {}
         for obj, obj_tracks in tracks.items():
-            if obj == 'ball':
+            if obj in ('ball', 'referees'):
                 continue
             n_frames = len(obj_tracks)
             for start in range(0, n_frames, self.WINDOW):
@@ -47,7 +47,7 @@ class SpeedDistanceEstimator:
     def draw_speed_and_distance(self, frames, tracks):
         for frame_num, frame in enumerate(frames):
             for obj, obj_tracks in tracks.items():
-                if obj == 'ball':
+                if obj in ('ball', 'referees'):
                     continue
                 for tid, data in obj_tracks[frame_num].items():
                     speed = data.get('speed')
@@ -55,12 +55,16 @@ class SpeedDistanceEstimator:
                     bbox  = data.get('bbox')
                     if speed is None or bbox is None:
                         continue
-                    x1,_,_,y2 = map(int, bbox)
-                    cv2.putText(frame, f"{speed:.1f}km/h",
-                                (x1, y2+20),
+                    x1, y1, x2, y2 = map(int, bbox)
+                    foot_x = (x1 + x2) // 2
+                    foot_y = y2
+                    text_x = foot_x
+                    text_y = foot_y + 40
+                    cv2.putText(frame, f"{speed:.2f} km/h",
+                                (text_x, text_y),
                                 cv2.FONT_HERSHEY_SIMPLEX,
-                                0.5, (255,255,255), 2)
-                    cv2.putText(frame, f"{dist:.1f}m",
-                                (x1, y2+40),
+                                0.5, (0,0,0), 2)
+                    cv2.putText(frame, f"{dist:.2f} m",
+                                (text_x, text_y + 20),
                                 cv2.FONT_HERSHEY_SIMPLEX,
-                                0.5, (255,255,255), 2)
+                                0.5, (0,0,0), 2)
