@@ -8,6 +8,7 @@ import pickle
 import threading
 import time
 import traceback
+import hashlib
 
 import gradio as gr
 import numpy as np
@@ -42,7 +43,9 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
     log("Reading video...")
     progress(0, desc="Reading video...")
     video_frames = read_video(video_path)
-    stub_key = Path(video_path).stem
+    with open(video_path, 'rb') as f:
+        file_hash = hashlib.md5(f.read(1024*1024)).hexdigest()[:12]
+    stub_key = file_hash
     log(f"Loaded {len(video_frames)} frames")
 
     cap = cv2.VideoCapture(video_path)
