@@ -1,4 +1,3 @@
-%%writefile app/gradio_app.py
 import os
 import sys
 from pathlib import Path
