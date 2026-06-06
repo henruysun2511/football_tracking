@@ -10,7 +10,12 @@ import cv2
 class Tracker:
     def __init__(self, model_path=None):
         self.model   = YOLO(model_path) if model_path else None
-        self.tracker = sv.ByteTrack() if model_path else None
+        self.tracker = sv.ByteTrack(
+            track_activation_threshold=0.25,
+            lost_track_buffer=30,
+            minimum_matching_threshold=0.8,
+            frame_rate=25,
+        ) if model_path else None   
 
     # ── Detection ────────────────────────────────────────────
     def detect_frames(self, frames, batch_size=20):

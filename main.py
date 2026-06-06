@@ -89,12 +89,11 @@ def phase1_tracking(video_path='input_videos/sample.mp4'):
 
 def phase2_render(video_frames, tracks, cam_move,
                   team_ball_control, team_assigner, fps=30):
-    for frame_num in range(total):
-        if frame_num == 0:
-            # Print speed của tất cả player frame 0
-            for tid, data in tracks["players"][0].items():
-                print(f"RENDER frame=0 tid={tid} speed={data.get('speed')}")
-            break
+    total = len(video_frames)
+    if total > 0:
+        for tid, data in tracks["players"][0].items():
+            print(f"RENDER frame=0 tid={tid} speed={data.get('speed')}")
+        break
     print("Phase 2: Rendering...")
     import torch
     if torch.cuda.is_available():
@@ -134,6 +133,11 @@ def phase2_render(video_frames, tracks, cam_move,
 
     # jersey_cache = {}  # temporarily disabled
     for frame_num in range(total):
+        if frame_num == 0:
+            # Print speed của tất cả player frame 0
+            for tid, data in tracks["players"][0].items():
+                print(f"RENDER frame=0 tid={tid} speed={data.get('speed')}")
+            break
         if frame_num % 30 == 0:
             print(f"Rendering frame {frame_num}/{total}...")
         frame = video_frames[frame_num].copy()
