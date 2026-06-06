@@ -165,5 +165,8 @@ with gr.Blocks(title="Football AI Analysis", css="""
 
 if __name__ == "__main__":
     import sys
-    is_colab = "google.colab" in sys.modules
-    demo.launch(share=is_colab, server_port=7860)
+    is_notebook = any(
+        mod in sys.modules for mod in
+        ["google.colab", "kaggle"])
+    demo.launch(share=is_notebook or "KAGGLE_KERNEL_RUN_TYPE" in os.environ,
+                server_port=7860)
