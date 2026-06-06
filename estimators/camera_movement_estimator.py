@@ -54,8 +54,8 @@ class CameraMovementEstimator:
                     dist = ((nx - ox)**2 + (ny - oy)**2) ** 0.5
                     if dist > max_distance:
                         max_distance = dist
-                        dx = nx - ox
-                        dy = ny - oy
+                        dx = ox - nx
+                        dy = oy - ny
             if max_distance > self.minimum_distance:
                 movement.append([dx, dy])
                 old_pts = cv2.goodFeaturesToTrack(gray, **self.features)
