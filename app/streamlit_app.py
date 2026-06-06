@@ -9,8 +9,7 @@ import shutil
 
 import streamlit as st
 import numpy as np
-
-from utils import read_video, save_video
+from utils import read_video
 from trackers import Tracker
 from asigners import TeamAssigner, PlayerBallAssigner
 from estimators import (CameraMovementEstimator,
@@ -21,255 +20,295 @@ from heatmap_generator.heatmap_generator import HeatmapGenerator
 from minimap.minimap_renderer import MinimapRenderer
 
 st.set_page_config(layout="wide", page_title="Football AI Analysis")
-
 with open(Path(__file__).parent / "styles.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-CACHE_DIR = Path("cache")
-INPUT_DIR = Path("input_videos")
-CACHE_DIR.mkdir(exist_ok=True)
+CACHE = Path("cache")
+INPUT = Path("input_videos")
+CACHE.mkdir(exist_ok=True)
 
 
-def get_available_videos():
-    files = []
-    if INPUT_DIR.is_dir():
-        files += [str(f) for f in sorted(INPUT_DIR.iterdir())
+# ── pipeline ───────────────────────────────────────────────
+
+def _available():
+    items = []
+    if INPUT.is_dir():
+        items += [str(f) for f in sorted(INPUT.iterdir())
                   if f.suffix in (".mp4", ".avi", ".mov")]
-    if CACHE_DIR.is_dir():
-        for d in CACHE_DIR.iterdir():
+    if CACHE.is_dir():
+        for d in sorted(CACHE.iterdir()):
             if d.is_dir() and (d / "tracks_full.pkl").exists():
-                files.append(f"cache:{d.name}")
-    return files
+                items.append(f"cache:{d.name}")
+    return items
 
 
-def run_tracking(video_path, stub_key):
-    stub_dir = CACHE_DIR / stub_key
-    stub_dir.mkdir(parents=True, exist_ok=True)
+def _analyze(video_path, key):
+    sd = CACHE / key
+    sd.mkdir(parents=True, exist_ok=True)
 
-    video_frames = read_video(video_path)
+    frames = read_video(video_path)
+    tr = Tracker("models/player_detector.pt")
+    tracks = tr.get_object_tracks(
+        frames, read_from_stub=True,
+        stub_path=str(sd / "track_stubs.pkl"))
+    tr.add_position_to_tracks(tracks)
 
-    tracker = Tracker("models/player_detector.pt")
-    tracks = tracker.get_object_tracks(
-        video_frames,
-        read_from_stub=True,
-        stub_path=str(stub_dir / "track_stubs.pkl"))
-    tracker.add_position_to_tracks(tracks)
+    cam = CameraMovementEstimator(frames[0])
+    cm = cam.get_camera_movement(
+        frames, read_from_stub=True,
+        stub_path=str(sd / "camera_movement_stub.pkl"))
+    cam.add_adjust_positions_to_tracks(tracks, cm)
 
-    cam_est = CameraMovementEstimator(video_frames[0])
-    cam_move = cam_est.get_camera_movement(
-        video_frames,
-        read_from_stub=True,
-        stub_path=str(stub_dir / "camera_movement_stub.pkl"))
-    cam_est.add_adjust_positions_to_tracks(tracks, cam_move)
+    kpd = PitchKeypointDetector("models/old/pitch_keypoint_detector.pt")
+    ViewTransformer(kpd).add_transformed_position_to_tracks(tracks, frames)
 
-    kp_detector = PitchKeypointDetector(
-        model_path="models/old/pitch_keypoint_detector.pt")
-    vt = ViewTransformer(kp_detector)
-    vt.add_transformed_position_to_tracks(tracks, video_frames)
+    tracks["ball"] = tr.interpolate_ball_positions(tracks["ball"])
 
-    tracks["ball"] = tracker.interpolate_ball_positions(tracks["ball"])
+    SpeedDistanceEstimator().add_speed_and_distance_to_tracks(tracks)
 
-    sde = SpeedDistanceEstimator()
-    sde.add_speed_and_distance_to_tracks(tracks)
-
-    team_assigner = TeamAssigner()
-    team_assigner.assign_team_color(video_frames[0], tracks["players"][0])
+    ta = TeamAssigner()
+    ta.assign_team_color(frames[0], tracks["players"][0])
     for fn, pt in enumerate(tracks["players"]):
         for pid, pd in pt.items():
-            team = team_assigner.get_player_team(video_frames[fn], pd["bbox"], pid)
+            team = ta.get_player_team(frames[fn], pd["bbox"], pid)
             tracks["players"][fn][pid]["team"] = team
-            tracks["players"][fn][pid]["team_color"] = team_assigner.team_colors[team]
+            tracks["players"][fn][pid]["team_color"] = ta.team_colors[team]
 
-    ball_assigner = PlayerBallAssigner()
-    team_ball_control = []
+    ba = PlayerBallAssigner()
+    tbc = []
     for fn, pt in enumerate(tracks["players"]):
-        ball_bbox = tracks["ball"][fn][1]["bbox"]
-        assigned = ball_assigner.assign_ball_to_player(pt, ball_bbox)
-        if assigned != -1:
-            tracks["players"][fn][assigned]["has_ball"] = True
-            team_ball_control.append(tracks["players"][fn][assigned]["team"])
+        bb = tracks["ball"][fn][1]["bbox"]
+        a = ba.assign_ball_to_player(pt, bb)
+        if a != -1:
+            tracks["players"][fn][a]["has_ball"] = True
+            tbc.append(tracks["players"][fn][a]["team"])
         else:
-            team_ball_control.append(team_ball_control[-1] if team_ball_control else 0)
-    team_ball_control = np.array(team_ball_control)
+            tbc.append(tbc[-1] if tbc else 0)
+    tbc = np.array(tbc)
 
-    with open(stub_dir / "tracks_full.pkl", "wb") as f:
+    with open(sd / "tracks_full.pkl", "wb") as f:
         pickle.dump(tracks, f)
-    with open(stub_dir / "cam_move.pkl", "wb") as f:
-        pickle.dump(cam_move, f)
-    np.save(stub_dir / "team_ball_control.npy", team_ball_control)
+    with open(sd / "cam_move.pkl", "wb") as f:
+        pickle.dump(cm, f)
+    np.save(sd / "team_ball_control.npy", tbc)
 
-    return video_frames, tracks, cam_move, team_ball_control, team_assigner
+    del frames
+    return tracks, cm, tbc, ta
 
 
-def load_from_cache(stub_key):
-    video_frames = read_video(str(CACHE_DIR / stub_key / "source.mp4"))
-    with open(CACHE_DIR / stub_key / "tracks_full.pkl", "rb") as f:
+def _load(key):
+    sd = CACHE / key
+    with open(sd / "tracks_full.pkl", "rb") as f:
         tracks = pickle.load(f)
-    with open(CACHE_DIR / stub_key / "cam_move.pkl", "rb") as f:
-        cam_move = pickle.load(f)
-    team_ball_control = np.load(CACHE_DIR / stub_key / "team_ball_control.npy")
-
-    team_assigner = TeamAssigner()
-    team_assigner.team_colors = {1: (0, 0, 255), 2: (255, 0, 0)}
-    for tid, data in tracks["players"][0].items():
-        tc = data.get("team_color")
+    with open(sd / "cam_move.pkl", "rb") as f:
+        cm = pickle.load(f)
+    tbc = np.load(sd / "team_ball_control.npy")
+    ta = TeamAssigner()
+    ta.team_colors = {1: (0, 0, 255), 2: (255, 0, 0)}
+    for _, d in tracks["players"][0].items():
+        tc = d.get("team_color")
         if tc is not None:
-            team_assigner.team_colors[data.get("team", 1)] = tuple(int(c) for c in tc)
-
-    return video_frames, tracks, cam_move, team_ball_control, team_assigner
-
-
-def render_video(video_frames, tracks, cam_move, team_ball_control,
-                 team_assigner, show_keypoints, show_minimap):
-    tracker = Tracker("models/player_detector.pt")
-    cam_est = CameraMovementEstimator(video_frames[0])
-    sde = SpeedDistanceEstimator()
-
-    kp_detector = PitchKeypointDetector(
-        model_path="models/old/pitch_keypoint_detector.pt")
-    minimap_renderer = MinimapRenderer(w=350, h=230)
-
-    team_colors = {
-        1: tuple(int(c) for c in team_assigner.team_colors[1]),
-        2: tuple(int(c) for c in team_assigner.team_colors[2]),
-    }
-
-    annotated = tracker.draw_annotations(video_frames, tracks, team_ball_control)
-    annotated = cam_est.draw_camera_movement(annotated, cam_move)
-    sde.draw_speed_and_distance(annotated, tracks)
-
-    out = []
-    for fn, frame in enumerate(annotated):
-        frame = frame.copy()
-        if show_keypoints:
-            kps = kp_detector.detect_smoothed(video_frames[fn])
-            if kps is not None:
-                frame = kp_detector.draw_keypoints(frame, kps)
-        if show_minimap:
-            mm = minimap_renderer.render(tracks, fn, team_colors=team_colors)
-            frame = minimap_renderer.overlay(frame, mm, pos="bottom_right")
-        out.append(frame)
-    return out
+            ta.team_colors[d.get("team", 1)] = tuple(int(c) for c in tc)
+    return tracks, cm, tbc, ta
 
 
-# ── UI ────────────────────────────────────────────────────
+def _render(video_path, tracks, cm, tbc, ta, show_kp, show_mm, out):
+    tr = Tracker()
+    kpd = PitchKeypointDetector("models/old/pitch_keypoint_detector.pt")
+    mm = MinimapRenderer(w=350, h=230)
+    tc = {1: tuple(int(c) for c in ta.team_colors[1]),
+          2: tuple(int(c) for c in ta.team_colors[2])}
+
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+    writer = cv2.VideoWriter(str(out), fourcc, fps, (w, h))
+
+    fn = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        for tid, d in tracks["players"][fn].items():
+            color = d.get("team_color", (0, 255, 0))
+            frame = tr.draw_ellipse(frame, d["bbox"], color, tid)
+            if d.get("has_ball"):
+                frame = tr.draw_triangle(frame, d["bbox"], (0, 255, 0))
+        for _, d in tracks["referees"][fn].items():
+            frame = tr.draw_ellipse(frame, d["bbox"], (255, 255, 0))
+        if 1 in tracks["ball"][fn]:
+            frame = tr.draw_triangle(
+                frame, tracks["ball"][fn][1]["bbox"], (0, 255, 255))
+
+        ov = frame.copy()
+        cv2.rectangle(ov, (0, 0), (500, 100), (255, 255, 255), -1)
+        cv2.addWeighted(ov, 0.2, frame, 0.8, 0, frame)
+        dx, dy = cm[fn]
+        cv2.putText(frame, "Camera Movement", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+        cv2.putText(frame, f"X: {dx:.1f}  Y: {dy:.1f}", (10, 70),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+
+        for _, d in tracks["players"][fn].items():
+            spd = d.get("speed")
+            dst = d.get("distance")
+            bb = d.get("bbox")
+            if spd is None or bb is None:
+                continue
+            fx = int((bb[0] + bb[2]) / 2)
+            fy = int(bb[3]) + 40
+            cv2.putText(frame, f"{spd:.2f} km/h", (fx, fy),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+            if dst is not None:
+                cv2.putText(frame, f"{dst:.2f} m", (fx, fy + 20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+
+        t1 = int(np.sum(tbc[:fn + 1] == 1))
+        t2 = int(np.sum(tbc[:fn + 1] == 2))
+        tot = t1 + t2 + 1e-6
+        cv2.putText(frame, f"Team1: {t1 / tot * 100:.0f}%",
+                    (w - 530, h - 80), cv2.FONT_HERSHEY_SIMPLEX,
+                    1, (255, 0, 0), 3)
+        cv2.putText(frame, f"Team2: {t2 / tot * 100:.0f}%",
+                    (w - 530, h - 50), cv2.FONT_HERSHEY_SIMPLEX,
+                    1, (0, 0, 255), 3)
+
+        if show_kp or show_mm:
+            kps = kpd.detect_smoothed(frame)
+        if show_kp and kps is not None:
+            frame = kpd.draw_keypoints(frame, kps)
+        if show_mm:
+            m = mm.render(tracks, fn, team_colors=tc)
+            frame = mm.overlay(frame, m, pos="bottom_right")
+
+        writer.write(frame)
+        fn += 1
+
+    cap.release()
+    writer.release()
+
+
+# ── UI ─────────────────────────────────────────────────────
 
 st.title("Football AI Analysis")
-st.caption("Detect players, ball, referees -- draw pitch keypoints, minimap, heatmap")
+st.caption("Detection → tracking → team assign → speed/distance → minimap → heatmap")
+
+if "ready" not in st.session_state:
+    st.session_state.ready = False
 
 with st.sidebar:
-    st.header("Video Source")
-    uploaded = st.file_uploader("Upload video", type=["mp4", "avi", "mov"])
-    available = get_available_videos()
-    selected = st.selectbox("Or select from input/cache", [""] + available)
-    use_cache = st.checkbox("Use cache if available", value=True)
-    analyze_btn = st.button("Analyze", type="primary")
+    st.header("Video")
+    uploaded = st.file_uploader("Upload", type=["mp4", "avi", "mov"])
+    available = _available()
+    selected = st.selectbox("Or pick", [""] + available)
+    use_cache = st.checkbox("Use cache", value=True)
+    analyze = st.button("Analyze", type="primary")
 
-    st.divider()
-    st.header("Overlay")
-    show_kp = st.checkbox("Pitch Keypoints", value=True)
-    show_mm = st.checkbox("Minimap", value=True)
-    show_hm = st.checkbox("Heatmap", value=False)
-    render_btn = st.button("Re-render", disabled=not show_hm)
-
-st.divider()
-
-if "video_frames" not in st.session_state:
-    st.session_state.video_frames = None
-if "tracks" not in st.session_state:
-    st.session_state.tracks = None
-if "processed" not in st.session_state:
-    st.session_state.processed = False
-
-if analyze_btn:
-    src_path = None
-    stub_key = None
-
-    if uploaded:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
-            tmp.write(uploaded.read())
-            src_path = tmp.name
-            stub_key = Path(uploaded.name).stem
-    elif selected:
-        if selected.startswith("cache:"):
-            name = selected.split(":", 1)[1]
-            stub_key = name
-            src_path = str(CACHE_DIR / name / "source.mp4")
-            if use_cache and (CACHE_DIR / name / "tracks_full.pkl").exists():
-                with st.spinner("Loading from cache..."):
-                    vf, tr, cm, tbc, ta = load_from_cache(name)
-                    st.session_state.video_frames = vf
-                    st.session_state.tracks = tr
-                    st.session_state.cam_move = cm
-                    st.session_state.team_ball_control = tbc
-                    st.session_state.team_assigner = ta
-                    st.session_state.processed = True
-                    st.success("Loaded from cache!")
-                stub_key = None
+    if analyze:
+        src = None
+        key = None
+        if uploaded:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+                tmp.write(uploaded.read())
+                src = tmp.name
+                key = Path(uploaded.name).stem
+        elif selected:
+            if selected.startswith("cache:"):
+                key = selected.split(":", 1)[1]
+                src = str(CACHE / key / "source.mp4")
+                if use_cache and (CACHE / key / "tracks_full.pkl").exists():
+                    with st.spinner("Loading cache..."):
+                        tr, cm, tbc, ta = _load(key)
+                        st.session_state.update(
+                            ready=True, stub=key, src=src,
+                            tracks=tr, cam_move=cm,
+                            team_ball_control=tbc, team_assigner=ta)
+                        st.success("Loaded!")
+                    key = None
             else:
-                stub_key = Path(selected).stem
-        else:
-            src_path = selected
-            stub_key = Path(selected).stem
+                key = Path(selected).stem
+                src = selected
 
-    if stub_key and src_path:
-        with st.spinner("Running analysis (may take a while)..."):
-            vf, tr, cm, tbc, ta = run_tracking(src_path, stub_key)
-            cache_dir = CACHE_DIR / stub_key
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            if not (cache_dir / "source.mp4").exists():
-                shutil.copy2(src_path, cache_dir / "source.mp4")
-            st.session_state.video_frames = vf
-            st.session_state.tracks = tr
-            st.session_state.cam_move = cm
-            st.session_state.team_ball_control = tbc
-            st.session_state.team_assigner = ta
-            st.session_state.processed = True
-            st.success("Analysis complete!")
+        if key and src:
+            with st.spinner("Analyzing..."):
+                tr, cm, tbc, ta = _analyze(src, key)
+                cd = CACHE / key
+                cd.mkdir(parents=True, exist_ok=True)
+                if not (cd / "source.mp4").exists():
+                    shutil.copy2(src, cd / "source.mp4")
+                st.session_state.update(
+                    ready=True, stub=key, src=src,
+                    tracks=tr, cam_move=cm,
+                    team_ball_control=tbc, team_assigner=ta)
+                st.success("Done!")
 
-if st.session_state.processed:
-    vf = st.session_state.video_frames
-    tr = st.session_state.tracks
-    cm = st.session_state.cam_move
-    tbc = st.session_state.team_ball_control
-    ta = st.session_state.team_assigner
+    if st.session_state.ready:
+        st.divider()
+        st.header("Overlay")
+        show_kp = st.checkbox("Pitch Keypoints", value=True)
+        show_mm = st.checkbox("Minimap", value=True)
 
+if not st.session_state.ready:
+    st.info("Select a video and click **Analyze**.")
+    st.stop()
+
+tr = st.session_state.tracks
+cm = st.session_state.cam_move
+tbc = st.session_state.team_ball_control
+ta = st.session_state.team_assigner
+
+# ── collapsible sections ───────────────────────────────────
+
+with st.expander("Summary", True):
     col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Frames", len(vf))
-    with col2:
-        players = len(set(tid for f in tr["players"] for tid in f.keys()))
-        st.metric("Players Detected", players)
-    with col3:
-        team1_pct = np.mean(tbc == 1) * 100 if len(tbc) > 0 else 0
-        st.metric("Possession Team 1", f"{team1_pct:.0f}%")
-    with col4:
-        team2_pct = np.mean(tbc == 2) * 100 if len(tbc) > 0 else 0
-        st.metric("Possession Team 2", f"{team2_pct:.0f}%")
+    col1.metric("Frames", len(tbc))
+    col2.metric("Players", len(set(
+        tid for f in tr["players"] for tid in f.keys())))
+    col3.metric("Team 1 Possession",
+                f"{np.mean(tbc == 1) * 100:.0f}%" if len(tbc) else "0%")
+    col4.metric("Team 2 Possession",
+                f"{np.mean(tbc == 2) * 100:.0f}%" if len(tbc) else "0%")
 
-    st.divider()
-    st.subheader("Result")
+with st.expander("Video", False):
+    show_heat = st.checkbox("Show Heatmap below video")
+    render = st.button("Render Video")
+    out_key = f"{st.session_state.stub}_kp{show_kp}_mm{show_mm}.avi"
+    out_path = CACHE / out_key
 
-    if render_btn and show_hm:
-        with st.spinner("Rendering heatmap..."):
+    if render:
+        with st.spinner("Rendering video..."):
+            _render(st.session_state.src, tr, cm, tbc, ta,
+                    show_kp, show_mm, out_path)
+        st.success("Rendered!")
+
+    if out_path.exists():
+        st.video(str(out_path))
+        with open(str(out_path), "rb") as f:
+            st.download_button("Download", f.read(), file_name="output.avi")
+
+    if show_heat:
+        with st.spinner("Generating heatmap..."):
             hm = HeatmapGenerator(w=630, h=420)
             hm.update_from_tracks(tr)
-            col1, col2, col3 = st.columns(3)
-            col1.image(hm.render_both(), caption="Both Teams",
-                       use_container_width=True)
-            col2.image(hm.render_team(1, cv2.COLORMAP_WINTER),
-                       caption="Team 1", use_container_width=True)
-            col3.image(hm.render_team(2, cv2.COLORMAP_AUTUMN),
-                       caption="Team 2", use_container_width=True)
+        c1, c2, c3 = st.columns(3)
+        c1.image(hm.render_both(), caption="Both", use_container_width=True)
+        c2.image(hm.render_team(1, cv2.COLORMAP_WINTER),
+                 caption="Team 1", use_container_width=True)
+        c3.image(hm.render_team(2, cv2.COLORMAP_AUTUMN),
+                 caption="Team 2", use_container_width=True)
 
-    with st.spinner("Rendering video..."):
-        out_frames = render_video(vf, tr, cm, tbc, ta, show_kp, show_mm)
-        out_path = CACHE_DIR / "preview.avi"
-        save_video(out_frames, str(out_path))
-
-    st.video(str(out_path))
-    with open(str(out_path), "rb") as f:
-        st.download_button("Download video", f.read(), file_name="output.avi")
-
-else:
-    st.info("Select a video and click Analyze to start.")
+with st.expander("Heatmap Only", False):
+    if st.button("Generate Heatmap"):
+        with st.spinner("..."):
+            hm = HeatmapGenerator(w=630, h=420)
+            hm.update_from_tracks(tr)
+        c1, c2, c3 = st.columns(3)
+        c1.image(hm.render_both(), caption="Both", use_container_width=True)
+        c2.image(hm.render_team(1, cv2.COLORMAP_WINTER),
+                 caption="Team 1", use_container_width=True)
+        c3.image(hm.render_team(2, cv2.COLORMAP_AUTUMN),
+                 caption="Team 2", use_container_width=True)
