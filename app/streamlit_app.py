@@ -170,12 +170,16 @@ def _render(video_path, tracks, cm, tbc, ta, show_kp, show_mm, out):
         t1 = int(np.sum(tbc[:fn + 1] == 1))
         t2 = int(np.sum(tbc[:fn + 1] == 2))
         tot = t1 + t2 + 1e-6
+        ov = frame.copy()
+        cv2.rectangle(ov, (w - 550, h - 120), (w - 370, h - 30),
+                      (255, 255, 255), -1)
+        cv2.addWeighted(ov, 0.4, frame, 0.6, 0, frame)
         cv2.putText(frame, f"Team1: {t1 / tot * 100:.0f}%",
                     (w - 530, h - 80), cv2.FONT_HERSHEY_SIMPLEX,
-                    1, (255, 0, 0), 3)
+                    1, (0, 0, 0), 3)
         cv2.putText(frame, f"Team2: {t2 / tot * 100:.0f}%",
                     (w - 530, h - 50), cv2.FONT_HERSHEY_SIMPLEX,
-                    1, (0, 0, 255), 3)
+                    1, (0, 0, 0), 3)
 
         if show_kp or show_mm:
             kps = kpd.detect_smoothed(frame)

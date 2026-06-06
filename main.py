@@ -171,13 +171,17 @@ def phase2_render(video_frames, tracks, cam_move,
                             0.5, (0, 0, 0), 2)
 
         # team ball control
-        team1_ct = np.sum(team_ball_control[:frame_num+1] == 1)
-        team2_ct = np.sum(team_ball_control[:frame_num+1] == 2)
-        bc_total = team1_ct + team2_ct + 1e-6
-        cv2.putText(frame, f"Team 1: {team1_ct/bc_total*100:.0f}%",
-                    (w-530, h-80), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), 3)
-        cv2.putText(frame, f"Team 2: {team2_ct/bc_total*100:.0f}%",
-                    (w-530, h-50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
+        t1 = int(np.sum(team_ball_control[:frame_num+1] == 1))
+        t2 = int(np.sum(team_ball_control[:frame_num+1] == 2))
+        tot = t1 + t2 + 1e-6
+        bc_overlay = frame.copy()
+        cv2.rectangle(bc_overlay, (w-550, h-120), (w-370, h-30),
+                      (255, 255, 255), -1)
+        cv2.addWeighted(bc_overlay, 0.4, frame, 0.6, 0, frame)
+        cv2.putText(frame, f"Team 1: {t1/tot*100:.0f}%",
+                    (w-530, h-80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 3)
+        cv2.putText(frame, f"Team 2: {t2/tot*100:.0f}%",
+                    (w-530, h-50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 3)
 
         # formation overlay
         cv2.putText(frame, f"Team 1: {n1}", (10, h-80),
