@@ -42,7 +42,7 @@ def phase1_tracking(video_path='input_videos/sample.mp4'):
     cam_est.add_adjust_positions_to_tracks(tracks, cam_move)
 
     kp_detector = PitchKeypointDetector(
-        model_path='models/old/pitch_keypoint_detector.pt')
+        model_path='models/pitch_keypoint_detector.pt')
     vt = ViewTransformer(kp_detector)
     vt.add_transformed_position_to_tracks(tracks, video_frames)
 
@@ -164,7 +164,7 @@ def phase2_render(video_frames, tracks, cam_move,
             pos = list(get_foot_position(bbox))
             pos[1] += 40
             pos = tuple(map(int, pos))
-            cv2.putText(frame, f"{spd:.2f} km/h", pos,
+            cv2.putText(frame, f"{spd:.1f} km/h", pos,
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.5, (0, 0, 0), 2)
             if dst is not None:
