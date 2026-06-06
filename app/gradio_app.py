@@ -46,8 +46,10 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
     cam_est.add_adjust_positions_to_tracks(tracks, cam_move)
 
     progress(0.25, desc="View transform...")
-    vt = ViewTransformer()
-    vt.add_transformed_position_to_tracks(tracks)
+    kp_detector = PitchKeypointDetector(
+        model_path="models/old/pitch_keypoint_detector.pt")
+    vt = ViewTransformer(kp_detector)
+    vt.add_transformed_position_to_tracks(tracks, video_frames)
     tracks["ball"] = tracker.interpolate_ball_positions(tracks["ball"])
 
     sde = SpeedDistanceEstimator()

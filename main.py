@@ -93,7 +93,6 @@ def phase2_render(video_frames, tracks, cam_move,
     else:
         print("WARNING: No GPU detected, running on CPU")
     tracker = Tracker()
-    cam_est = CameraMovementEstimator(video_frames[0])
 
     kp_detector = PitchKeypointDetector(
         model_path='models/old/pitch_keypoint_detector.pt')
@@ -108,6 +107,13 @@ def phase2_render(video_frames, tracks, cam_move,
 
     os.makedirs('output_videos', exist_ok=True)
 
+    h, w = video_frames[0].shape[:2]
+    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+    out_writer = cv2.VideoWriter(
+        'output_videos/output_enhanced.avi', fourcc, 30, (w, h))
+
+    total = len(video_frames)
+
     # Detect formations
     f1, n1, c1 = detect_team_formation(
         tracks, 1, frame_nums=range(0, total, 30), method='kmeans')
@@ -118,13 +124,6 @@ def phase2_render(video_frames, tracks, cam_move,
 
     jersey_cache = {}
     print("Jersey OCR ready (lazy init on first use)")
-
-    h, w = video_frames[0].shape[:2]
-    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-    out_writer = cv2.VideoWriter(
-        'output_videos/output_enhanced.avi', fourcc, 30, (w, h))
-
-    total = len(video_frames)
     for frame_num in range(total):
         if frame_num % 30 == 0:
             print(f"Rendering frame {frame_num}/{total}...")
