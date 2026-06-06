@@ -39,7 +39,6 @@ class Tracker:
                 return pickle.load(f)
 
         detections = self.detect_frames(frames)
-        print(f"DEBUG: {len(detections)} detection results from {len(frames)} frames")
 
         tracks = {
             "players":  [],
@@ -48,12 +47,6 @@ class Tracker:
         }
 
         for frame_num, detection in enumerate(detections):
-            if frame_num == 0:
-                print(f"DEBUG frame 0: type={type(detection)}")
-                try:
-                    print(f"  boxes={len(detection.boxes)} obb={hasattr(detection, 'obb')}")
-                except:
-                    print("  no boxes attr")
             cls_names     = detection.names
             cls_names_inv = {v: k for k, v in cls_names.items()}
 
@@ -65,31 +58,25 @@ class Tracker:
 
             det_with_tracks = self.tracker.update_with_detections(det_sv)
 
-            if frame_num == 0:
-                print(f"DEBUG ByteTrack: type={type(det_with_tracks)} len={len(det_with_tracks)}")
-                if len(det_with_tracks) > 0:
-                    first = det_with_tracks[0]
-                    print(f"  first item type={type(first)} len={len(first)} items={first}")
-                else:
-                    print(f"  EMPTY! det_sv had {len(det_sv)} objects")
-
             tracks["players"].append({})
             tracks["referees"].append({})
             tracks["ball"].append({})
 
-            for frame_detection in det_with_tracks:
-                bbox     = frame_detection[0].tolist()
-                cls_id   = frame_detection[3]
-                track_id = frame_detection[4]
+            for i in range(len(det_with_tracks)):
+                bbox     = det_with_tracks.xyxy[i].tolist()
+                cls_id   = det_with_tracks.class_id[i]
+                track_id = det_with_tracks.tracker_id[i]
 
+                if track_id is None:
+                    continue
                 if cls_id == cls_names_inv['player']:
                     tracks["players"][frame_num][track_id] = {"bbox": bbox}
                 if cls_id == cls_names_inv['referee']:
                     tracks["referees"][frame_num][track_id] = {"bbox": bbox}
 
-            for frame_detection in det_sv:
-                bbox   = frame_detection[0].tolist()
-                cls_id = frame_detection[3]
+            for i in range(len(det_sv)):
+                bbox   = det_sv.xyxy[i].tolist()
+                cls_id = det_sv.class_id[i]
 
                 if cls_id == cls_names_inv['ball']:
                     tracks["ball"][frame_num][1] = {"bbox": bbox}
