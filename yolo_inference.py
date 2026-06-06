@@ -2,13 +2,13 @@ import os
 from ultralytics import YOLO 
 
 # Khởi tạo model
-model = YOLO('models/player_detector.pt')
+model = YOLO('models/pitch_keypoint_detector.pt')
 
 results_generator = model.predict(
-    'input_videos/sample.mp4',
+    'input_videos/sample2.mp4',
     save=True,
     project='output_videos',
-    name='.',
+   name='inference',
     exist_ok=True,
     stream=True,
     device=0,
