@@ -45,6 +45,9 @@ def _analyze(video_path, key):
     sd.mkdir(parents=True, exist_ok=True)
 
     frames = read_video(video_path)
+    cap = cv2.VideoCapture(video_path)
+    vid_fps = cap.get(cv2.CAP_PROP_FPS) or 24
+    cap.release()
     tr = Tracker("models/player_detector.pt")
     tracks = tr.get_object_tracks(
         frames, read_from_stub=True,
@@ -62,7 +65,7 @@ def _analyze(video_path, key):
 
     tracks["ball"] = tr.interpolate_ball_positions(tracks["ball"])
 
-    SpeedDistanceEstimator().add_speed_and_distance_to_tracks(tracks)
+    SpeedDistanceEstimator().add_speed_and_distance_to_tracks(tracks, fps=vid_fps)
 
     ta = TeamAssigner()
     ta.assign_team_color(frames[0], tracks["players"][0])
@@ -167,16 +170,16 @@ def _render(video_path, tracks, cm, tbc, ta, show_kp, show_mm, out):
         t1 = int(np.sum(tbc[:fn + 1] == 1))
         t2 = int(np.sum(tbc[:fn + 1] == 2))
         tot = t1 + t2 + 1e-6
-        ov = frame.copy()
-        cv2.rectangle(ov, (w - 550, h - 120), (w - 370, h - 30),
+        bc_ov = frame.copy()
+        cv2.rectangle(bc_ov, (w - 310, 10), (w - 10, 100),
                       (255, 255, 255), -1)
-        cv2.addWeighted(ov, 0.4, frame, 0.6, 0, frame)
+        cv2.addWeighted(bc_ov, 0.4, frame, 0.6, 0, frame)
         cv2.putText(frame, f"Team1: {t1 / tot * 100:.0f}%",
-                    (w - 530, h - 80), cv2.FONT_HERSHEY_SIMPLEX,
-                    1, (0, 0, 0), 3)
+                    (w - 290, 50), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8, (0, 0, 0), 2)
         cv2.putText(frame, f"Team2: {t2 / tot * 100:.0f}%",
-                    (w - 530, h - 50), cv2.FONT_HERSHEY_SIMPLEX,
-                    1, (0, 0, 0), 3)
+                    (w - 290, 80), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8, (0, 0, 0), 2)
 
         if show_kp or show_mm:
             kps = kpd.detect_smoothed(frame)

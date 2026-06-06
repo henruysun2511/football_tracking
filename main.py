@@ -23,6 +23,9 @@ STUB_DIR = 'stubs'
 def phase1_tracking(video_path='input_videos/sample.mp4'):
     video_frames = read_video(video_path)
     print(f"Loaded {len(video_frames)} frames from {video_path}")
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 24
+    cap.release()
 
     tracker = Tracker('models/player_detector.pt')
     tracks = tracker.get_object_tracks(
@@ -46,7 +49,7 @@ def phase1_tracking(video_path='input_videos/sample.mp4'):
     tracks['ball'] = tracker.interpolate_ball_positions(tracks['ball'])
 
     sde = SpeedDistanceEstimator()
-    sde.add_speed_and_distance_to_tracks(tracks)
+    sde.add_speed_and_distance_to_tracks(tracks, fps=fps)
 
     team_assigner = TeamAssigner()
     team_assigner.assign_team_color(video_frames[0], tracks['players'][0])
@@ -169,18 +172,18 @@ def phase2_render(video_frames, tracks, cam_move,
                             cv2.FONT_HERSHEY_SIMPLEX,
                             0.5, (0, 0, 0), 2)
 
-        # team ball control
+        # team ball control (top-right)
         t1 = int(np.sum(team_ball_control[:frame_num+1] == 1))
         t2 = int(np.sum(team_ball_control[:frame_num+1] == 2))
         tot = t1 + t2 + 1e-6
-        bc_overlay = frame.copy()
-        cv2.rectangle(bc_overlay, (w-550, h-120), (w-370, h-30),
+        bc_ov = frame.copy()
+        cv2.rectangle(bc_ov, (w-310, 10), (w-10, 100),
                       (255, 255, 255), -1)
-        cv2.addWeighted(bc_overlay, 0.4, frame, 0.6, 0, frame)
-        cv2.putText(frame, f"Team 1: {t1/tot*100:.0f}%",
-                    (w-530, h-80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 3)
-        cv2.putText(frame, f"Team 2: {t2/tot*100:.0f}%",
-                    (w-530, h-50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 3)
+        cv2.addWeighted(bc_ov, 0.4, frame, 0.6, 0, frame)
+        cv2.putText(frame, f"Team1: {t1/tot*100:.0f}%",
+                    (w-290, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2)
+        cv2.putText(frame, f"Team2: {t2/tot*100:.0f}%",
+                    (w-290, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2)
 
         # formation overlay
         cv2.putText(frame, f"Team 1: {n1}", (10, h-80),

@@ -4,10 +4,9 @@ from utils import measure_distance
 
 
 class SpeedDistanceEstimator:
-    WINDOW = 5    # số frame mỗi cửa sổ tính tốc độ
-    FPS    = 24
+    WINDOW = 5
 
-    def add_speed_and_distance_to_tracks(self, tracks):
+    def add_speed_and_distance_to_tracks(self, tracks, fps=24):
         total_dist = {}
         for obj, obj_tracks in tracks.items():
             if obj in ('ball', 'referees'):
@@ -30,7 +29,7 @@ class SpeedDistanceEstimator:
 
                     dist_cm = measure_distance(p_start, p_end)
                     dist_m = dist_cm / 100
-                    elapsed = (end - start) / self.FPS
+                    elapsed = (end - start) / fps
                     speed_ms = dist_m / elapsed if elapsed > 0 else 0
                     speed_kh = speed_ms * 3.6
 
