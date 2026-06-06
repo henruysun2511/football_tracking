@@ -62,13 +62,15 @@ class Tracker:
             tracks["referees"].append({})
             tracks["ball"].append({})
 
+            # ByteTrack may return empty tracker_id in some supervision versions
+            tid = det_with_tracks.tracker_id
+            has_tid = tid is not None and len(tid) == len(det_with_tracks)
+
             for i in range(len(det_with_tracks)):
                 bbox     = det_with_tracks.xyxy[i].tolist()
                 cls_id   = det_with_tracks.class_id[i]
-                track_id = det_with_tracks.tracker_id[i]
+                track_id = int(tid[i]) if has_tid else i
 
-                if track_id is None:
-                    continue
                 if cls_id == cls_names_inv['player']:
                     tracks["players"][frame_num][track_id] = {"bbox": bbox}
                 if cls_id == cls_names_inv['referee']:
