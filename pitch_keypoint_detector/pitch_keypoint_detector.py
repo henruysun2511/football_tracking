@@ -127,7 +127,13 @@ class PitchKeypointDetector:
         for i, ((x, y), c) in enumerate(zip(xy, confs)):
             if c < self.conf:
                 continue
-            cv2.circle(frame, (int(x), int(y)), 4, (0, 255, 0), -1)
-            cv2.putText(frame, str(i), (int(x) + 5, int(y) - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+            ix, iy = int(x), int(y)
+            intensity = min(1.0, c / 0.7)
+            color = (0, int(255 * intensity), int(255 * (1 - intensity)))
+            cv2.circle(frame, (ix, iy), 5, color, -1)
+            cv2.circle(frame, (ix, iy), 5, (255, 255, 255), 1)
+            cv2.putText(frame, str(i), (ix + 6, iy - 6),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 2)
+            cv2.putText(frame, str(i), (ix + 6, iy - 6),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
         return frame

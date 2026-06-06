@@ -12,8 +12,8 @@ class MinimapRenderer:
         self.scale_y = h / self.config.width
 
     def _pitch_to_minimap(self, pos):
-        x = int(pos[0] * self.scale_x)
-        y = int(pos[1] * self.scale_y)
+        x = max(0, min(int(pos[0] * self.scale_x), self.w - 1))
+        y = max(0, min(int(pos[1] * self.scale_y), self.h - 1))
         return x, y
 
     def _draw_pitch(self):

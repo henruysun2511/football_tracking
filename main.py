@@ -151,22 +151,22 @@ def phase2_render(video_frames, tracks, cam_move,
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 3)
 
         # speed / distance (below foot — reference style)
+        from utils import get_foot_position
         for tid, data in tracks["players"][frame_num].items():
             spd = data.get("speed")
             dst = data.get("distance")
             bbox = data.get("bbox")
             if spd is None or bbox is None:
                 continue
-            x1, _, x2, y2 = map(int, bbox)
-            foot_x = (x1 + x2) // 2
-            foot_y = y2
-            cv2.putText(frame, f"{spd:.2f} km/h",
-                        (foot_x, foot_y + 40),
+            pos = list(get_foot_position(bbox))
+            pos[1] += 40
+            pos = tuple(map(int, pos))
+            cv2.putText(frame, f"{spd:.2f} km/h", pos,
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.5, (0, 0, 0), 2)
             if dst is not None:
                 cv2.putText(frame, f"{dst:.2f} m",
-                            (foot_x, foot_y + 60),
+                            (pos[0], pos[1] + 20),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             0.5, (0, 0, 0), 2)
 

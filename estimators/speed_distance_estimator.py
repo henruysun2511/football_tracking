@@ -28,7 +28,8 @@ class SpeedDistanceEstimator:
                     if p_start is None or p_end is None:
                         continue
 
-                    dist_m = measure_distance(p_start, p_end)
+                    dist_cm = measure_distance(p_start, p_end)
+                    dist_m = dist_cm / 100
                     elapsed = (end - start) / self.FPS
                     speed_ms = dist_m / elapsed if elapsed > 0 else 0
                     speed_kh = speed_ms * 3.6
