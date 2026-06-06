@@ -35,7 +35,7 @@ def log(msg):
     with _log_lock:
         ts = time.strftime("%H:%M:%S")
         _log_lines.append(f"[{ts}] {msg}")
-        return "\n".join(_log_lines[-50:])
+        return "\n".join(_log_lines[-100:])
 
 
 def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
@@ -46,22 +46,27 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
     with open(video_path, 'rb') as f:
         file_hash = hashlib.md5(f.read(1024*1024)).hexdigest()[:12]
     stub_key = file_hash
-    log(f"Loaded {len(video_frames)} frames")
+    log(f"Loaded {len(video_frames)} frames from {Path(video_path).name}")
 
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 24
     cap.release()
 
-    log("Tracking players...")
-    progress(0.05, desc="Tracking players...")
+    import torch
+    if torch.cuda.is_available():
+        log(f"GPU: {torch.cuda.get_device_name(0)} VRAM free: {torch.cuda.mem_get_info()[0]/1024**3:.1f}GB")
+    else:
+        log("WARNING: No GPU detected, running on CPU")
+
+    progress(0.02, desc="Tracking players...")
     tracker = Tracker("models/player_detector.pt")
     tracks = tracker.get_object_tracks(
         video_frames, read_from_stub=True,
         stub_path=str(CACHE_DIR / f"{stub_key}_track.pkl"))
     tracker.add_position_to_tracks(tracks)
-    log(f"Players: {len(tracks['players'])} frames tracked")
+    log(f"Tracking done — {len(tracks['players'])} frames")
 
-    log("Camera estimation...")
+    log("Estimating camera movement...")
     progress(0.15, desc="Camera estimation...")
     cam_est = CameraMovementEstimator(video_frames[0])
     cam_move = cam_est.get_camera_movement(
@@ -69,7 +74,7 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
         stub_path=str(CACHE_DIR / f"{stub_key}_cam.pkl"))
     cam_est.add_adjust_positions_to_tracks(tracks, cam_move)
 
-    log("View transform & interpolation...")
+    log("Computing homography & interpolating...")
     progress(0.25, desc="Pitch keypoints -> homography...")
     kp_detector = PitchKeypointDetector(
         model_path="models/pitch_keypoint_detector.pt")
@@ -81,8 +86,8 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
     sde = SpeedDistanceEstimator()
     sde.add_speed_and_distance_to_tracks(tracks, fps=fps)
 
-    log("Assigning teams by jersey color...")
-    progress(0.35, desc="Assigning teams...")
+    log("Assigning teams...")
+    progress(0.35, desc="Assigning teams by jersey color...")
     team_assigner = TeamAssigner()
     team_assigner.assign_team_color(video_frames[0], tracks["players"][0])
     for fn, pt in enumerate(tracks["players"]):
@@ -110,7 +115,8 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
         tracks, 1, frame_nums=range(0, total_frames, 30), method='kmeans')
     f2, n2, c2 = detect_team_formation(
         tracks, 2, frame_nums=range(0, total_frames, 30), method='kmeans')
-    log(f"Team 1: {n1} ({c1:.0%})  Team 2: {n2} ({c2:.0%})")
+    log(f"Team 1 formation: {n1} (conf={c1:.0%})")
+    log(f"Team 2 formation: {n2} (conf={c2:.0%})")
 
     log("Rendering frames...")
     progress(0.5, desc="Rendering frames...")
@@ -128,6 +134,7 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
 
     for fn in range(total):
         if fn % 30 == 0:
+            log(f"Rendering frame {fn}/{total}...")
             progress(0.5 + 0.45 * fn / total,
                      desc=f"Rendering frame {fn}/{total}...")
         frame = video_frames[fn].copy()
@@ -199,12 +206,12 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
             frame = minimap_renderer.overlay(frame, mm, pos="bottom_right")
 
         out_frames.append(frame)
-    log(f"Rendered {total} frames")
+    log(f"Rendered {total} frames — saving video...")
 
     progress(0.95, desc="Saving output video...")
     out_path = str(CACHE_DIR / f"{stub_key}_output.mp4")
     save_video(out_frames, out_path, fps=fps)
-    log("Saved output video")
+    log(f"Saved: {out_path}")
 
     heatmap_paths = []
     if show_heatmap:
@@ -220,7 +227,7 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
         hm2_path = str(CACHE_DIR / f"{stub_key}_hm_t2.png")
         cv2.imwrite(hm2_path, hm.render_team(2, cv2.COLORMAP_AUTUMN))
         heatmap_paths.append(hm2_path)
-        log("Heatmaps saved")
+        log("Saved heatmaps")
 
     progress(1.0, desc="Done!")
     log("Processing complete!")
@@ -245,7 +252,7 @@ def video_ui(file, show_kp, show_mm, show_hm, progress=gr.Progress()):
 with gr.Blocks(title="Football AI Analysis", css="""
     footer { display: none !important; }
     .gradio-container { max-width: 1100px !important; margin: auto; }
-    #log-box { font-size: 12px; font-family: monospace; background: #1e1e1e; color: #0f0; padding: 10px; border-radius: 4px; height: 180px; overflow-y: auto; white-space: pre-wrap; }
+    #log-box { font-size: 12px; font-family: monospace; background: #1e1e1e; color: #0f0; padding: 10px; border-radius: 4px; height: 300px; overflow-y: auto; white-space: pre-wrap; }
 """) as demo:
     gr.Markdown("# Football AI Analysis")
     gr.Markdown("Detect players, ball, referees -- draw pitch keypoints, minimap, heatmap")
