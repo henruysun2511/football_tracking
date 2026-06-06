@@ -99,7 +99,7 @@ def phase2_render(video_frames, tracks, cam_move,
     tracker = Tracker()
 
     kp_detector = PitchKeypointDetector(
-        model_path='models/old/pitch_keypoint_detector.pt')
+        model_path='models/pitch_keypoint_detector.pt')
     heatmap_gen = HeatmapGenerator(w=630, h=420)
     heatmap_gen.update_from_tracks(tracks)
     minimap_renderer = MinimapRenderer(w=350, h=230)
