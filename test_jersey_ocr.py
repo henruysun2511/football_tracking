@@ -15,7 +15,7 @@ from ocr.jersey_ocr import read_jersey_number, crop_jersey_region
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--video', default='output_videos/output_enhanced.avi')
+    parser.add_argument('--video', default='output_videos/download.mp4')
     parser.add_argument('--frame-interval', type=int, default=30,
                         help='Test every N frames')
     parser.add_argument('--max-frames', type=int, default=10,
@@ -34,6 +34,9 @@ def main():
     print("Detecting jersey numbers...")
     print()
 
+    from ultralytics import YOLO
+    model = YOLO('models/player_detector.pt')
+
     frame_nums = list(range(0, total, args.frame_interval))[:args.max_frames]
     all_results = []
 
@@ -43,11 +46,6 @@ def main():
         if not ret:
             break
 
-        # Use a simple person detector (YOLO from our model)
-        from ultralytics import YOLO
-        model = YOLO('models/player_detector.pt')
-
-        # NOTE: Tracker is loaded automatically; we just use predict
         results = model.predict(frame, conf=0.3, verbose=False)[0]
 
         for box in results.boxes:
@@ -77,14 +75,16 @@ def main():
             all_results.append(result)
 
             if args.show and crop is not None:
-                cv2.imshow(f'Frame {fi} - Player', crop)
-                key = cv2.waitKey(0)
-                if key == ord('q'):
-                    break
-                cv2.destroyAllWindows()
+                try:
+                    cv2.imshow(f'Frame {fi} - Player', crop)
+                    key = cv2.waitKey(0)
+                    if key == ord('q'):
+                        break
+                    cv2.destroyAllWindows()
+                except cv2.error:
+                    pass  # headless OpenCV
 
     cap.release()
-    cv2.destroyAllWindows()
 
     # Report
     detected = [r for r in all_results if r['number'] is not None]

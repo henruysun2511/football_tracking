@@ -8,8 +8,11 @@ def _get_reader():
     global _reader
     if _reader is None:
         import easyocr
-        _reader = easyocr.Reader(['en'], gpu=True)
+        _reader = easyocr.Reader(['en'], gpu=False)
     return _reader
+
+
+SCALE = 3
 
 
 def crop_jersey_region(frame, bbox):
@@ -17,9 +20,8 @@ def crop_jersey_region(frame, bbox):
     x1, y1, x2, y2 = map(int, bbox)
     h = y2 - y1
     w = x2 - x1
-    # Number is usually in upper 40-60% of bbox
     crop_top = y1 + int(h * 0.05)
-    crop_bottom = y1 + int(h * 0.55)
+    crop_bottom = y1 + int(h * 0.65)
     crop_left = x1 + int(w * 0.1)
     crop_right = x2 - int(w * 0.1)
     if crop_bottom <= crop_top or crop_right <= crop_left:
@@ -29,18 +31,15 @@ def crop_jersey_region(frame, bbox):
 
 
 def preprocess_crop(crop):
-    """Preprocess for OCR: grayscale, enhance contrast, threshold."""
-    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    # Enhance contrast
-    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+    """Upscale and enhance contrast (no binary threshold — keep natural image for EasyOCR)."""
+    if min(crop.shape[:2]) * SCALE < 30:
+        return None
+    enlarged = cv2.resize(crop, None, fx=SCALE, fy=SCALE,
+                          interpolation=cv2.INTER_CUBIC)
+    gray = cv2.cvtColor(enlarged, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
-    # Adaptive threshold to isolate text
-    binary = cv2.adaptiveThreshold(
-        enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY_INV, 15, 8)
-    # Denoise
-    denoised = cv2.medianBlur(binary, 3)
-    return denoised
+    return enhanced
 
 
 def read_jersey_number(frame, bbox, cache=None, track_id=None):
@@ -67,7 +66,9 @@ def read_jersey_number(frame, bbox, cache=None, track_id=None):
     reader = _get_reader()
     results = reader.readtext(processed, allowlist='0123456789')
 
-    for (_, text), conf in [(r[1], r[2]) for r in results]:
+    for r in results:
+        text = r[1]
+        conf = r[2]
         text = text.strip()
         if text and conf > 0.3:
             try:
