@@ -1,61 +1,54 @@
 # analysis/visualize_perspective.py
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from utils import read_video
+from pitch_keypoint_detector.pitch_keypoint_detector import PitchKeypointDetector
 
-# 4 điểm góc vùng sân trong ảnh (giống view_transformer.py gốc)
-# Đây là tọa độ pixel của 4 góc vùng sân đã định nghĩa thủ công
-PIXEL_VERTICES = np.array([
-    [115, 550],   # góc trên-trái
-    [1280, 550],  # góc trên-phải
-    [915, 970],   # góc dưới-phải
-    [430, 970],   # góc dưới-trái
-], dtype=np.float32)
+kp_detector = PitchKeypointDetector(
+    model_path='models/old/pitch_keypoint_detector.pt')
 
-# Kích thước thực tế vùng sân tương ứng (mét)
-# Dựa trên FIFA standard: đường 16.5m, chiều ngang ~68m
-TARGET_W, TARGET_H = 68, 23.32  # mét
-TARGET_VERTICES = np.array([
-    [0, 0],
-    [TARGET_W, 0],
-    [TARGET_W, TARGET_H],
-    [0, TARGET_H],
-], dtype=np.float32)
-
-# Tính perspective transform matrix
-M, _ = cv2.findHomography(PIXEL_VERTICES, TARGET_VERTICES * 10)
-
-video_frames = read_video('input_videos/08fd33_4.mp4')
+video_frames = read_video('input_videos/sample.mp4')
 frame = cv2.cvtColor(video_frames[0], cv2.COLOR_BGR2RGB)
 
-# Warp toàn ảnh (chỉ để visualize)
-warped = cv2.warpPerspective(frame, M, (680, 233))
+# Phát hiện keypoints + tính homography
+kps = kp_detector.detect_smoothed(video_frames[0])
+M = kp_detector.get_homography(kps)
+
+H, W = frame.shape[:2]
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 fig.suptitle("Perspective Transformation – Chuyển view camera → Top-down (bird's eye)",
              fontsize=12, fontweight='bold')
 
-# Frame gốc + polygon vùng sân
+# Frame gốc + keypoints
 ax = axes[0]
 ax.imshow(frame)
-poly = plt.Polygon(PIXEL_VERTICES, fill=False, edgecolor='yellow', linewidth=3)
-ax.add_patch(poly)
-for i, (x,y) in enumerate(PIXEL_VERTICES):
-    ax.annotate(f'P{i+1}\n({x:.0f},{y:.0f})', (x,y), fontsize=9,
-                color='yellow', ha='center',
-                bbox=dict(boxstyle='round,pad=0.2', facecolor='black', alpha=0.7))
-ax.set_title("Ảnh gốc (góc camera nghiêng)\nVùng vàng = vùng sân cần transform")
+if kps is not None:
+    xy, confs = kps
+    mask = confs > kp_detector.conf
+    for (x, y) in xy[mask]:
+        ax.plot(x, y, 'yo', markersize=4)
+ax.set_title(f"Ảnh gốc ({W}x{H}) — Pitch keypoints dùng để tính homography")
 ax.axis('off')
 
 # Ảnh sau transform
+length = kp_detector.config.length
+width  = kp_detector.config.width
 ax = axes[1]
-ax.imshow(warped)
-ax.set_title(f"Sau Perspective Transform (Bird's eye view)\n"
-             f"Tương ứng {TARGET_W}m × {TARGET_H:.1f}m sân thực tế")
-for i, (x, y) in enumerate(TARGET_VERTICES * 10):
-    ax.annotate(f'P{i+1}', (x,y), fontsize=9, color='yellow', ha='center')
+if M is not None:
+    warped = cv2.warpPerspective(frame, M, (length // 10, width // 10))
+    ax.imshow(warped)
+    ax.set_title(f"Sau Perspective Transform (Bird's eye view)\n"
+                 f"Sân {length/100:.0f}m × {width/100:.0f}m (tỉ lệ 1:10)")
+else:
+    ax.text(0.5, 0.5, 'Không đủ keypoints để tính homography\n(cần >= 4 keypoints)',
+            transform=ax.transAxes, ha='center', va='center', fontsize=12)
 ax.axis('off')
 
 plt.tight_layout()

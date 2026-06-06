@@ -6,7 +6,7 @@ import os, cv2
 import numpy as np
 from pathlib import Path
 
-DATASET_ROOT = "training/football-players-detection-1"
+DATASET_ROOT = "datasets/football-players-detection-2"
 SPLITS       = ["train", "valid", "test"]
 NUM_CLASSES  = 4
 CLASS_NAMES  = ["ball", "goalkeeper", "player", "referee"]

@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-DATASET_ROOT = "training/football-players-detection-1"
+DATASET_ROOT = "datasets/football-players-detection-2"
 CLASS_NAMES  = ["ball", "goalkeeper", "player", "referee"]
 OUTPUT_SIZE  = 640
 COLORS       = [(255,50,50), (0,200,255), (50,200,50), (255,160,0)]

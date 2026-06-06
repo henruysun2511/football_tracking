@@ -7,7 +7,7 @@ import matplotlib.patches as mpatches
 from pathlib import Path
 import random
 
-DATASET_ROOT = "training/football-players-detection-1"
+DATASET_ROOT = "datasets/football-players-detection-2"
 CLASS_NAMES  = ["ball", "goalkeeper", "player", "referee"]
 COLORS_CV    = [(255,50,50), (0,200,255), (50,200,50), (255,160,0)]
 COLORS_MPL   = ['#ff3232', '#00c8ff', '#32c832', '#ffa000']

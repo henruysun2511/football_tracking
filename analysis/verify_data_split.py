@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from collections import Counter
 
-DATASET_ROOT = "training/football-players-detection-1"
+DATASET_ROOT = "datasets/football-players-detection-2"
 SPLITS       = ["train", "valid", "test"]
 CLASS_NAMES  = ["ball", "goalkeeper", "player", "referee"]
 SPLIT_COLORS = ['#3498db', '#2ecc71', '#e74c3c']

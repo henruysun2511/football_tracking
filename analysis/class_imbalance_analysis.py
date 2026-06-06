@@ -7,7 +7,7 @@ import matplotlib.patches as mpatches
 from pathlib import Path
 from collections import defaultdict
 
-DATASET_ROOT = "training/football-players-detection-1"
+DATASET_ROOT = "datasets/football-players-detection-2"
 CLASS_NAMES  = ["ball", "goalkeeper", "player", "referee"]
 
 def load_all_labels(split):

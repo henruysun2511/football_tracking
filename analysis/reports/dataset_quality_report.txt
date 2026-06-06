@@ -1,0 +1,32 @@
+============================================================
+  FOOTBALL DATASET – QUALITY REPORT
+============================================================
+
+[TRAIN]  612 ảnh  |  0 vấn đề
+----------------------------------------
+  [OK] corrupt_images        : 0
+  [OK] missing_labels        : 0
+  [OK] empty_labels          : 0
+  [OK] invalid_class         : 0
+  [OK] bbox_out_of_bounds    : 0
+  [OK] malformed_lines       : 0
+
+[VALID]  38 ảnh  |  0 vấn đề
+----------------------------------------
+  [OK] corrupt_images        : 0
+  [OK] missing_labels        : 0
+  [OK] empty_labels          : 0
+  [OK] invalid_class         : 0
+  [OK] bbox_out_of_bounds    : 0
+  [OK] malformed_lines       : 0
+
+[TEST]  13 ảnh  |  0 vấn đề
+----------------------------------------
+  [OK] corrupt_images        : 0
+  [OK] missing_labels        : 0
+  [OK] empty_labels          : 0
+  [OK] invalid_class         : 0
+  [OK] bbox_out_of_bounds    : 0
+  [OK] malformed_lines       : 0
+
+TỔNG VẤN ĐỀ: 0

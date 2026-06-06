@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from ultralytics import YOLO
+from ultralytics.nn.modules.head import Detect
 
 
 class SoccerPitchConfig:
@@ -60,6 +61,10 @@ class PitchKeypointDetector:
     def __init__(self, model_path='models/pitch_keypoint.pt',
                  conf_threshold=0.3):
         self.model = YOLO(model_path)
+        # Fix version mismatch: older training code missing `detect` attribute
+        head = self.model.model.model[-1]
+        if not hasattr(head, 'detect'):
+            head.detect = Detect.forward
         import torch
         self.device = 0 if torch.cuda.is_available() else 'cpu'
         if self.device != 'cpu':

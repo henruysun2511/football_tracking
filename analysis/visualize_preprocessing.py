@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import random
 from pathlib import Path
 
-DATASET_ROOT = "training/football-players-detection-1"
+DATASET_ROOT = "datasets/football-players-detection-2"
 CLASS_NAMES = ["ball", "goalkeeper", "player", "referee"]
 COLORS = {0: (255,0,0), 1: (0,255,255), 2: (0,255,0), 3: (255,128,0)}
 

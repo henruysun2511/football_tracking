@@ -1,5 +1,9 @@
 # analysis/visualize_optical_flow.py
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,7 +20,7 @@ LK_PARAMS = dict(
     criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)
 )
 
-video_frames = read_video('input_videos/08fd33_4.mp4')
+video_frames = read_video('input_videos/sample.mp4')
 frame1 = video_frames[0]
 frame2 = video_frames[1]
 
