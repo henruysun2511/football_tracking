@@ -90,13 +90,43 @@ class Tracker:
 
         return tracks
 
-    # ── Ball interpolation ───────────────────────────────────
+    # ── Ball and Player interpolation ───────────────────────
     def interpolate_ball_positions(self, ball_positions):
         ball_list = [x.get(1, {}).get('bbox', []) for x in ball_positions]
         df = pd.DataFrame(ball_list,
                           columns=['x1','y1','x2','y2'])
         df = df.interpolate().bfill()
         return [{1: {"bbox": row}} for row in df.to_numpy().tolist()]
+
+    def interpolate_player_positions(self, player_positions):
+        all_tids = set()
+        for frame_data in player_positions:
+            all_tids.update(frame_data.keys())
+        
+        for tid in all_tids:
+            frames_with_tid = [f for f, frame_data in enumerate(player_positions) if tid in frame_data]
+            if not frames_with_tid:
+                continue
+            first_frame = frames_with_tid[0]
+            last_frame = frames_with_tid[-1]
+            
+            bboxes = []
+            for f in range(first_frame, last_frame + 1):
+                if tid in player_positions[f]:
+                    bboxes.append(player_positions[f][tid]['bbox'])
+                else:
+                    bboxes.append([np.nan, np.nan, np.nan, np.nan])
+            
+            df = pd.DataFrame(bboxes, columns=['x1', 'y1', 'x2', 'y2'])
+            df = df.interpolate(method='linear')
+            
+            bboxes_interpolated = df.to_numpy().tolist()
+            for i, f in enumerate(range(first_frame, last_frame + 1)):
+                if tid not in player_positions[f]:
+                    player_positions[f][tid] = {}
+                player_positions[f][tid]['bbox'] = bboxes_interpolated[i]
+                
+        return player_positions
 
     # ── Position helpers ─────────────────────────────────────
     def add_position_to_tracks(self, tracks):

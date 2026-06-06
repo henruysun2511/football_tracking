@@ -47,6 +47,7 @@ def phase1_tracking(video_path='input_videos/sample.mp4'):
     vt.add_transformed_position_to_tracks(tracks, video_frames)
 
     tracks['ball'] = tracker.interpolate_ball_positions(tracks['ball'])
+    tracks['players'] = tracker.interpolate_player_positions(tracks['players'])
 
     sde = SpeedDistanceEstimator()
     sde.add_speed_and_distance_to_tracks(tracks, fps=fps)
@@ -172,18 +173,18 @@ def phase2_render(video_frames, tracks, cam_move,
                             cv2.FONT_HERSHEY_SIMPLEX,
                             0.5, (0, 0, 0), 2)
 
-        # team ball control (top-right)
+        # team ball control (top-left, below camera movement)
         t1 = int(np.sum(team_ball_control[:frame_num+1] == 1))
         t2 = int(np.sum(team_ball_control[:frame_num+1] == 2))
         tot = t1 + t2 + 1e-6
         bc_ov = frame.copy()
-        cv2.rectangle(bc_ov, (w-310, 10), (w-10, 100),
+        cv2.rectangle(bc_ov, (10, 110), (310, 200),
                       (255, 255, 255), -1)
         cv2.addWeighted(bc_ov, 0.4, frame, 0.6, 0, frame)
         cv2.putText(frame, f"Team1: {t1/tot*100:.0f}%",
-                    (w-290, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2)
+                    (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2)
         cv2.putText(frame, f"Team2: {t2/tot*100:.0f}%",
-                    (w-290, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2)
+                    (30, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2)
 
         # formation overlay
         cv2.putText(frame, f"Team 1: {n1}", (10, h-80),

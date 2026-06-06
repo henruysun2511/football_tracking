@@ -23,10 +23,7 @@ class ViewTransformer:
         M = self.kp_detector.get_homography(kps) if kps is not None else None
 
         if M is not None:
-            self.M_history.append(M)
             self.last_good_M = M
-            if len(self.M_history) >= 2:
-                M = np.mean(np.array(self.M_history), axis=0)
         else:
             M = self.last_good_M
 
