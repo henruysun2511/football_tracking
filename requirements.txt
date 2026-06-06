@@ -21,5 +21,4 @@ scikit-learn>=1.4.0
 pyyaml>=6.0
 seaborn>=0.13.0
 
-# OCR
-easyocr>=1.7.0
+

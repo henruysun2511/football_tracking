@@ -4,8 +4,6 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 import cv2
 import pickle
-import tempfile
-import shutil
 
 import streamlit as st
 import numpy as np
@@ -37,7 +35,7 @@ def _available():
                   if f.suffix in (".mp4", ".avi", ".mov")]
     if CACHE.is_dir():
         for d in sorted(CACHE.iterdir()):
-            if d.is_dir() and (d / "tracks_full.pkl").exists():
+            if d.is_dir() and (d / "tracks_full.pkl").exists() and (d / "source.mp4").exists():
                 items.append(f"cache:{d.name}")
     return items
 
@@ -123,7 +121,6 @@ def _render(video_path, tracks, cm, tbc, ta, show_kp, show_mm, out):
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fourcc = cv2.VideoWriter_fourcc(*'MJPG')
     writer = cv2.VideoWriter(str(out), fourcc, fps, (w, h))
 
@@ -215,11 +212,14 @@ with st.sidebar:
     if analyze:
         src = None
         key = None
+
         if uploaded:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
-                tmp.write(uploaded.read())
-                src = tmp.name
-                key = Path(uploaded.name).stem
+            key = Path(uploaded.name).stem
+            cd = CACHE / key
+            cd.mkdir(parents=True, exist_ok=True)
+            src = str(cd / "source.mp4")
+            with open(src, "wb") as f:
+                f.write(uploaded.read())
         elif selected:
             if selected.startswith("cache:"):
                 key = selected.split(":", 1)[1]
@@ -240,10 +240,6 @@ with st.sidebar:
         if key and src:
             with st.spinner("Analyzing..."):
                 tr, cm, tbc, ta = _analyze(src, key)
-                cd = CACHE / key
-                cd.mkdir(parents=True, exist_ok=True)
-                if not (cd / "source.mp4").exists():
-                    shutil.copy2(src, cd / "source.mp4")
                 st.session_state.update(
                     ready=True, stub=key, src=src,
                     tracks=tr, cam_move=cm,
