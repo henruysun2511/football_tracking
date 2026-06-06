@@ -4,7 +4,7 @@ import numpy as np
 import pickle
 import argparse
 
-from utils import read_video
+from utils import read_video, get_foot_position
 from trackers import Tracker
 from asigners import TeamAssigner, PlayerBallAssigner
 from estimators import (CameraMovementEstimator,
@@ -20,9 +20,9 @@ from formations import detect_team_formation
 STUB_DIR = 'stubs'
 
 
-def phase1_tracking():
-    video_frames = read_video('input_videos/sample.mp4')
-    print(f"Loaded {len(video_frames)} frames")
+def phase1_tracking(video_path='input_videos/sample.mp4'):
+    video_frames = read_video(video_path)
+    print(f"Loaded {len(video_frames)} frames from {video_path}")
 
     tracker = Tracker('models/player_detector.pt')
     tracks = tracker.get_object_tracks(
@@ -84,7 +84,7 @@ def phase1_tracking():
 
 
 def phase2_render(video_frames, tracks, cam_move,
-                  team_ball_control, team_assigner):
+                  team_ball_control, team_assigner, fps=30):
     print("Phase 2: Rendering...")
     import torch
     if torch.cuda.is_available():
@@ -110,7 +110,7 @@ def phase2_render(video_frames, tracks, cam_move,
     h, w = video_frames[0].shape[:2]
     fourcc = cv2.VideoWriter_fourcc(*'MJPG')
     out_writer = cv2.VideoWriter(
-        'output_videos/output_enhanced.avi', fourcc, 30, (w, h))
+        'output_videos/output_enhanced.avi', fourcc, fps, (w, h))
 
     total = len(video_frames)
 
@@ -151,7 +151,6 @@ def phase2_render(video_frames, tracks, cam_move,
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 3)
 
         # speed / distance (below foot — reference style)
-        from utils import get_foot_position
         for tid, data in tracks["players"][frame_num].items():
             spd = data.get("speed")
             dst = data.get("distance")
@@ -212,14 +211,18 @@ def phase2_render(video_frames, tracks, cam_move,
     print("Saved heatmaps to output_videos/")
 
 
-def phase2_render_from_stubs():
+def phase2_render_from_stubs(video_path='input_videos/sample.mp4'):
     with open(f'{STUB_DIR}/tracks_full.pkl', 'rb') as f:
         tracks = pickle.load(f)
     with open(f'{STUB_DIR}/cam_move.pkl', 'rb') as f:
         cam_move = pickle.load(f)
     team_ball_control = np.load(f'{STUB_DIR}/team_ball_control.npy')
 
-    video_frames = read_video('input_videos/sample.mp4')
+    video_frames = read_video(video_path)
+
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30
+    cap.release()
 
     team_assigner = TeamAssigner()
     team_assigner.team_colors = {1: (0, 0, 255), 2: (255, 0, 0)}
@@ -230,19 +233,24 @@ def phase2_render_from_stubs():
                 tuple(int(c) for c in tc)
 
     phase2_render(video_frames, tracks, cam_move,
-                  team_ball_control, team_assigner)
+                  team_ball_control, team_assigner, fps=fps)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['tracking', 'render', 'all'],
                         default='all')
+    parser.add_argument('--video', default='input_videos/sample.mp4',
+                        help='Path to input video')
     args = parser.parse_args()
 
     if args.mode == 'tracking':
-        phase1_tracking()
+        phase1_tracking(args.video)
     elif args.mode == 'render':
-        phase2_render_from_stubs()
+        phase2_render_from_stubs(args.video)
     else:
-        vf, tr, cm, tbc, ta = phase1_tracking()
-        phase2_render(vf, tr, cm, tbc, ta)
+        vf, tr, cm, tbc, ta = phase1_tracking(args.video)
+        cap = cv2.VideoCapture(args.video)
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30
+        cap.release()
+        phase2_render(vf, tr, cm, tbc, ta, fps=fps)
