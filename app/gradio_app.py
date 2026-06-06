@@ -47,7 +47,7 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
 
     progress(0.25, desc="View transform...")
     kp_detector = PitchKeypointDetector(
-        model_path="models/old/pitch_keypoint_detector.pt")
+        model_path="models/pitch_keypoint_detector.pt")
     vt = ViewTransformer(kp_detector)
     vt.add_transformed_position_to_tracks(tracks, video_frames)
     tracks["ball"] = tracker.interpolate_ball_positions(tracks["ball"])
@@ -82,7 +82,7 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
     sde.draw_speed_and_distance(annotated, tracks)
 
     kp_detector = PitchKeypointDetector(
-        model_path="models/old/pitch_keypoint_detector.pt")
+        model_path="models/pitch_keypoint_detector.pt")
     minimap_renderer = MinimapRenderer(w=350, h=230)
     team_colors = {
         1: tuple(int(c) for c in team_assigner.team_colors[1]),
@@ -169,4 +169,4 @@ if __name__ == "__main__":
         mod in sys.modules for mod in
         ["google.colab", "kaggle"])
     demo.launch(share=is_notebook or "KAGGLE_KERNEL_RUN_TYPE" in os.environ,
-                server_port=7861)
+                server_port=7862)
