@@ -12,7 +12,7 @@ import traceback
 import gradio as gr
 import numpy as np
 
-from utils import read_video, save_video
+from utils import read_video, save_video, get_foot_position
 from trackers import Tracker
 from asigners import TeamAssigner, PlayerBallAssigner
 from estimators import (CameraMovementEstimator,
@@ -21,6 +21,7 @@ from estimators import (CameraMovementEstimator,
 from pitch_keypoint_detector.pitch_keypoint_detector import PitchKeypointDetector
 from heatmap_generator.heatmap_generator import HeatmapGenerator
 from minimap.minimap_renderer import MinimapRenderer
+from formations import detect_team_formation
 
 CACHE_DIR = Path("cache_gradio")
 CACHE_DIR.mkdir(exist_ok=True)
@@ -44,6 +45,10 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
     stub_key = Path(video_path).stem
     log(f"Loaded {len(video_frames)} frames")
 
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 24
+    cap.release()
+
     log("Tracking players...")
     progress(0.05, desc="Tracking players...")
     tracker = Tracker("models/player_detector.pt")
@@ -62,15 +67,16 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
     cam_est.add_adjust_positions_to_tracks(tracks, cam_move)
 
     log("View transform & interpolation...")
-    progress(0.25, desc="Pitch keypoints → homography...")
+    progress(0.25, desc="Pitch keypoints -> homography...")
     kp_detector = PitchKeypointDetector(
         model_path="models/pitch_keypoint_detector.pt")
     vt = ViewTransformer(kp_detector)
     vt.add_transformed_position_to_tracks(tracks, video_frames)
     tracks["ball"] = tracker.interpolate_ball_positions(tracks["ball"])
+    tracks["players"] = tracker.interpolate_player_positions(tracks["players"])
 
     sde = SpeedDistanceEstimator()
-    sde.add_speed_and_distance_to_tracks(tracks)
+    sde.add_speed_and_distance_to_tracks(tracks, fps=fps)
 
     log("Assigning teams by jersey color...")
     progress(0.35, desc="Assigning teams...")
@@ -94,13 +100,22 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
             team_ball_control.append(team_ball_control[-1] if team_ball_control else 0)
     team_ball_control = np.array(team_ball_control)
 
-    log("Rendering annotations...")
-    progress(0.5, desc="Rendering annotations...")
-    annotated = tracker.draw_annotations(video_frames, tracks, team_ball_control)
-    annotated = cam_est.draw_camera_movement(annotated, cam_move)
-    sde.draw_speed_and_distance(annotated, tracks)
+    log("Detecting formations...")
+    progress(0.45, desc="Detecting formations...")
+    total_frames = len(video_frames)
+    f1, n1, c1 = detect_team_formation(
+        tracks, 1, frame_nums=range(0, total_frames, 30), method='kmeans')
+    f2, n2, c2 = detect_team_formation(
+        tracks, 2, frame_nums=range(0, total_frames, 30), method='kmeans')
+    log(f"Team 1: {n1} ({c1:.0%})  Team 2: {n2} ({c2:.0%})")
 
-    kp_detector = PitchKeypointDetector(
+    log("Rendering frames...")
+    progress(0.5, desc="Rendering frames...")
+    h, w = video_frames[0].shape[:2]
+    out_frames = []
+    total = len(video_frames)
+
+    kp_detector2 = PitchKeypointDetector(
         model_path="models/pitch_keypoint_detector.pt")
     minimap_renderer = MinimapRenderer(w=350, h=230)
     team_colors = {
@@ -108,28 +123,84 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
         2: tuple(int(c) for c in team_assigner.team_colors[2]),
     }
 
-    log("Rendering frames with overlays...")
-    progress(0.7, desc=f"Rendering frames (0/{len(annotated)})...")
-    out_frames = []
-    total = len(annotated)
-    for fn, frame in enumerate(annotated):
+    for fn in range(total):
         if fn % 30 == 0:
-            progress(0.7 + 0.25 * fn / total,
-                     desc=f"Rendering frames ({fn}/{total})...")
-        frame = frame.copy()
+            progress(0.5 + 0.45 * fn / total,
+                     desc=f"Rendering frame {fn}/{total}...")
+        frame = video_frames[fn].copy()
+
+        # Draw players, referees, ball
+        for tid, data in tracks["players"][fn].items():
+            color = data.get("team_color", (0, 255, 0))
+            frame = tracker.draw_ellipse(frame, data["bbox"], color, tid)
+            if data.get("has_ball"):
+                frame = tracker.draw_triangle(frame, data["bbox"], (0, 255, 0))
+        for tid, data in tracks["referees"][fn].items():
+            frame = tracker.draw_ellipse(frame, data["bbox"], (255, 255, 0), tid)
+        if 1 in tracks["ball"][fn]:
+            frame = tracker.draw_triangle(
+                frame, tracks["ball"][fn][1]["bbox"], (0, 255, 255))
+
+        # Camera movement overlay (top-left)
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (0, 0), (500, 100), (255, 255, 255), -1)
+        cv2.addWeighted(overlay, 0.2, frame, 0.8, 0, frame)
+        dx, dy = cam_move[fn]
+        cv2.putText(frame, "Camera Movement", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+        cv2.putText(frame, f"X: {dx:.1f}  Y: {dy:.1f}", (10, 70),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+
+        # Speed / distance per player
+        for tid, data in tracks["players"][fn].items():
+            spd = data.get("speed")
+            dst = data.get("distance")
+            bbox = data.get("bbox")
+            if spd is None or bbox is None:
+                continue
+            pos = list(get_foot_position(bbox))
+            pos[1] += 40
+            pos = tuple(map(int, pos))
+            cv2.putText(frame, f"{spd:.1f} km/h", pos,
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+            if dst is not None:
+                cv2.putText(frame, f"{dst:.1f} m",
+                            (pos[0], pos[1] + 20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+
+        # Team ball control (top-left, below camera movement)
+        t1 = int(np.sum(team_ball_control[:fn + 1] == 1))
+        t2 = int(np.sum(team_ball_control[:fn + 1] == 2))
+        tot = t1 + t2 + 1e-6
+        bc_ov = frame.copy()
+        cv2.rectangle(bc_ov, (10, 110), (310, 200), (255, 255, 255), -1)
+        cv2.addWeighted(bc_ov, 0.4, frame, 0.6, 0, frame)
+        cv2.putText(frame, f"Team1: {t1 / tot * 100:.0f}%",
+                    (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+        cv2.putText(frame, f"Team2: {t2 / tot * 100:.0f}%",
+                    (30, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+
+        # Formation overlay (bottom-left)
+        cv2.putText(frame, f"Team 1: {n1}", (10, h - 80),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+        cv2.putText(frame, f"Team 2: {n2}", (10, h - 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
+        # Pitch keypoints + minimap
         if show_keypoints:
-            kps = kp_detector.detect_smoothed(video_frames[fn])
+            kps = kp_detector2.detect_smoothed(video_frames[fn])
             if kps is not None:
-                frame = kp_detector.draw_keypoints(frame, kps)
+                frame = kp_detector2.draw_keypoints(frame, kps)
         if show_minimap:
             mm = minimap_renderer.render(tracks, fn, team_colors=team_colors)
             frame = minimap_renderer.overlay(frame, mm, pos="bottom_right")
+
         out_frames.append(frame)
     log(f"Rendered {total} frames")
 
     progress(0.95, desc="Saving output video...")
     out_path = str(CACHE_DIR / f"{stub_key}_output.mp4")
-    save_video(out_frames, out_path)
+    save_video(out_frames, out_path, fps=fps)
     log("Saved output video")
 
     heatmap_paths = []
@@ -174,7 +245,7 @@ with gr.Blocks(title="Football AI Analysis", css="""
     #log-box { font-size: 12px; font-family: monospace; background: #1e1e1e; color: #0f0; padding: 10px; border-radius: 4px; height: 180px; overflow-y: auto; white-space: pre-wrap; }
 """) as demo:
     gr.Markdown("# Football AI Analysis")
-    gr.Markdown("Detect players, ball, referees — draw pitch keypoints, minimap, heatmap")
+    gr.Markdown("Detect players, ball, referees -- draw pitch keypoints, minimap, heatmap")
 
     with gr.Row():
         with gr.Column(scale=1):
