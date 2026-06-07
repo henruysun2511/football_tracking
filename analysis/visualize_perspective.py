@@ -11,7 +11,7 @@ from utils import read_video
 from pitch_keypoint_detector.pitch_keypoint_detector import PitchKeypointDetector
 
 kp_detector = PitchKeypointDetector(
-    model_path='models/old/pitch_keypoint_detector.pt')
+    model_path='models/pitch_keypoint_detector.pt')
 
 video_frames = read_video('input_videos/sample.mp4')
 frame = cv2.cvtColor(video_frames[0], cv2.COLOR_BGR2RGB)

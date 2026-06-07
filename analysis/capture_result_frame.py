@@ -1,5 +1,5 @@
 # analysis/capture_result_frame.py
-# Chạy sau khi đã có output_videos/output_video.avi
+# Chạy sau khi đã có output_videos/output_enhanced.avi
 
 import cv2
 import matplotlib.pyplot as plt
@@ -43,15 +43,20 @@ def capture_best_frames(video_path, output_path, n_frames=6):
     plt.show()
     print(f"Saved: {output_path}")
 
-# Chạy
+import os
+
+if not os.path.exists('output_videos/output_enhanced.avi'):
+    print("No output video found. Run main.py first to generate output_videos/output_enhanced.avi")
+    exit(0)
+
 capture_best_frames(
-    'output_videos/output_video.avi',
+    'output_videos/output_enhanced.avi',
     'analysis/figures/result_showcase.png',
     n_frames=6
 )
 
 # Lưu 1 frame chất lượng cao để đưa vào báo cáo
-cap = cv2.VideoCapture('output_videos/output_video.avi')
+cap = cv2.VideoCapture('output_videos/output_enhanced.avi')
 cap.set(cv2.CAP_PROP_POS_FRAMES, 100)
 ret, frame = cap.read()
 if ret:

@@ -71,6 +71,9 @@ def create_mosaic(img_paths, lbl_paths, out_size=640):
     return mosaic, all_labels, cx, cy
 
 # Lấy 4 ảnh ngẫu nhiên từ train
+if not Path(DATASET_ROOT).exists():
+    print(f"Dataset not found at {DATASET_ROOT}. Skipping.")
+    exit(0)
 img_dir = Path(DATASET_ROOT) / "train" / "images"
 lbl_dir = Path(DATASET_ROOT) / "train" / "labels"
 all_imgs = list(img_dir.glob("*.jpg"))

@@ -20,6 +20,9 @@ def yolo_to_pixel(cx, cy, bw, bh, img_w, img_h):
     return x1, y1, x2, y2
 
 # Chọn ảnh có nhiều class nhất
+if not Path(DATASET_ROOT).exists():
+    print(f"Dataset not found at {DATASET_ROOT}. Skipping.")
+    exit(0)
 img_dir = Path(DATASET_ROOT) / "train" / "images"
 lbl_dir = Path(DATASET_ROOT) / "train" / "labels"
 

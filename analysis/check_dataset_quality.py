@@ -11,6 +11,10 @@ SPLITS       = ["train", "valid", "test"]
 NUM_CLASSES  = 4
 CLASS_NAMES  = ["ball", "goalkeeper", "player", "referee"]
 
+if not Path(DATASET_ROOT).exists():
+    print(f"Dataset not found at {DATASET_ROOT}. Skipping.")
+    exit(0)
+
 def check_split(split):
     img_dir = Path(DATASET_ROOT) / split / "images"
     lbl_dir = Path(DATASET_ROOT) / split / "labels"

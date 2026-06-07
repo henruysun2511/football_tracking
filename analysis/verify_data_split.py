@@ -11,6 +11,10 @@ SPLITS       = ["train", "valid", "test"]
 CLASS_NAMES  = ["ball", "goalkeeper", "player", "referee"]
 SPLIT_COLORS = ['#3498db', '#2ecc71', '#e74c3c']
 
+if not Path(DATASET_ROOT).exists():
+    print(f"Dataset not found at {DATASET_ROOT}. Skipping.")
+    exit(0)
+
 split_data = {}
 for split in SPLITS:
     img_dir = Path(DATASET_ROOT) / split / "images"

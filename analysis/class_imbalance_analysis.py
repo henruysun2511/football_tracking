@@ -20,6 +20,10 @@ def load_all_labels(split):
                 records.append((int(p[0]), *map(float, p[1:])))
     return records
 
+if not Path(DATASET_ROOT).exists():
+    print(f"Dataset not found at {DATASET_ROOT}. Skipping.")
+    exit(0)
+
 records = load_all_labels("train")
 cls_ids = [r[0] for r in records]
 areas   = [r[3] * r[4] for r in records]  # w × h normalized

@@ -27,6 +27,10 @@ def parse_labels(label_dir):
                     records.append((int(cls), float(w), float(h)))
     return records
 
+if not Path(DATASET_ROOT).exists():
+    print(f"Dataset not found at {DATASET_ROOT}. Skipping.")
+    exit(0)
+
 def count_images(split):
     """Đếm số lượng ảnh, hỗ trợ cả đuôi viết hoa/thường (jpg, png, jpeg)"""
     img_dir = Path(DATASET_ROOT) / split / "images"
@@ -111,7 +115,7 @@ else:
     small_objects = sum(1 for a in areas if a < 0.002)
     # Tránh crash nếu total_object bằng 0
     small_percentage = (small_objects / total * 100) if total > 0 else 0
-    print(f"\Small objects (<0.2% diện tích ảnh): {small_objects} ({small_percentage:.1f}%)")
+    print(f"\nSmall objects (<0.2% diện tích ảnh): {small_objects} ({small_percentage:.1f}%)")
     
     # Tính tỉ lệ mất cân bằng dữ liệu an toàn
     ball_count = max(class_counts.get(0, 1), 1)

@@ -1,6 +1,6 @@
 # analysis/visualize_preprocessing.py
 
-import cv2
+import cv2, os
 import numpy as np
 import matplotlib.pyplot as plt
 import random
@@ -53,7 +53,9 @@ def simulate_augmentations(img):
     return results
 
 # --- Chọn ảnh mẫu ngẫu nhiên từ train ---
-import os
+if not os.path.isdir(DATASET_ROOT):
+    print(f"Dataset not found at {DATASET_ROOT}. Skipping — run training first to generate dataset.")
+    exit(0)
 img_dir = Path(DATASET_ROOT) / "train" / "images"
 sample_img_path = random.choice(list(img_dir.glob("*.jpg")))
 label_path = str(sample_img_path).replace("images", "labels").replace(".jpg", ".txt")

@@ -31,7 +31,7 @@ def segment_player_color(crop):
 
 # Load video frame và track data
 from utils import read_video
-video_frames = read_video('input_videos/08fd33_4.mp4')
+video_frames = read_video('input_videos/sample.mp4')
 with open('stubs/track_stubs.pkl', 'rb') as f:
     tracks = pickle.load(f)
 
