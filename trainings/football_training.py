@@ -35,18 +35,18 @@ def main():
        os.makedirs(output_project, exist_ok=True)
 
     results = model.train(
-    data=data_yaml_location,
-    epochs=100,
-    imgsz=1280,
-    batch=8,
-    device=0,
-    project=output_project,  
-    name="player_detector",
-    patience=20,
-    save=True,
-    plots=True,
-    workers=2,
-)
+        data=data_yaml_location,
+        epochs=100,
+        imgsz=1280,
+        batch=8,
+        device=0,
+        project=output_project,  
+        name="player_detector",
+        patience=20,
+        save=True,
+        plots=True,
+        workers=2,
+    )
    
     print("\n==================================================")
     print("Quá trình huấn luyện hoàn tất!")

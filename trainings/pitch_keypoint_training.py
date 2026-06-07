@@ -34,17 +34,30 @@ def main():
 
 
     results = model.train(
-        data=data_yaml_location,
+        data=f"{dataset.location}/data.yaml",
         epochs=100,
-        imgsz=1280,
-        batch=8,           
+        imgsz=640,
+        batch=8,            # an toàn hơn với T4
         device=0,
-        project=output_project,  
+
+        patience=50,        # đủ dài để Pose mAP có thời gian học
+
+        lr0=0.01,
+        lrf=0.1,            # decay đúng: 0.01 → 0.001
+        warmup_epochs=5,
+
+        mosaic=1.0,         # bật mosaic 
+        close_mosaic=10,    # tắt mosaic 10 epoch cuối
+
+        degrees=10.0,
+        scale=0.2,          # giảm từ 0.5 xuống 0.2
+        fliplr=0.5,
+        flipud=0.0,
+
+        project=output_project,
         name="pitch_keypoint",
-        patience=20,
         save=True,
         plots=True,
-        workers=2,
     )
    
     print("\n==================================================")
