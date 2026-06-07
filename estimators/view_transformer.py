@@ -61,7 +61,7 @@ class ViewTransformer:
                     continue
 
                 for tid, data in frame_track.items():
-                    pos = data.get('position_adjusted') or data.get('position')
+                    pos = data.get('position')
                     if pos is None:
                         continue
                     try:

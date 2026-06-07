@@ -27,6 +27,7 @@ class SpeedDistanceEstimator:
                 if obj not in total_dist:
                     total_dist[obj] = {}
                 total_dist[obj].setdefault(tid, 0.0)
+                last_speed = None
 
                 # Duyệt từng window
                 for start in range(0, n_frames, self.WINDOW):
@@ -45,6 +46,11 @@ class SpeedDistanceEstimator:
 
                     # Cần ít nhất 2 frame khác nhau để tính speed
                     if first_fn is None or last_fn is None or first_fn == last_fn:
+                        if last_speed is not None:
+                            for fn in range(start, end + 1):
+                                if tid in obj_tracks[fn]:
+                                    obj_tracks[fn][tid]['speed'] = last_speed
+                                    obj_tracks[fn][tid]['distance'] = total_dist[obj][tid]
                         continue
 
                     p_start = obj_tracks[first_fn][tid]['position_transformed']
@@ -52,6 +58,11 @@ class SpeedDistanceEstimator:
 
                     dist_cm = measure_distance(p_start, p_end)
                     if dist_cm > _MAX_DIST_CM:
+                        if last_speed is not None:
+                            for fn in range(start, end + 1):
+                                if tid in obj_tracks[fn]:
+                                    obj_tracks[fn][tid]['speed'] = last_speed
+                                    obj_tracks[fn][tid]['distance'] = total_dist[obj][tid]
                         continue
 
                     elapsed  = (last_fn - first_fn) / fps
@@ -62,6 +73,7 @@ class SpeedDistanceEstimator:
                     speed_kh = min(speed_ms * 3.6, _MAX_SPEED_KMH)
 
                     total_dist[obj][tid] += dist_cm * _UNIT_TO_METER
+                    last_speed = speed_kh
 
                     # Ghi speed vào tất cả frame trong window có tid
                     for fn in range(start, end + 1):
