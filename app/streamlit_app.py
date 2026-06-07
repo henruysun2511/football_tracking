@@ -46,12 +46,15 @@ def _analyze(video_path, key):
 
     frames = read_video(video_path)
     cap = cv2.VideoCapture(video_path)
-    vid_fps = cap.get(cv2.CAP_PROP_FPS) or 24
+    vid_fps = cap.get(cv2.CAP_PROP_FPS) or 25
     cap.release()
     tr = Tracker("models/player_detector.pt")
     tracks = tr.get_object_tracks(
         frames, read_from_stub=True,
         stub_path=str(sd / "track_stubs.pkl"))
+
+    tracks["ball"] = tr.interpolate_ball_positions(tracks["ball"])
+    tracks["players"] = tr.interpolate_player_positions(tracks["players"])
     tr.add_position_to_tracks(tracks)
 
     cam = CameraMovementEstimator(frames[0])
@@ -62,8 +65,6 @@ def _analyze(video_path, key):
 
     kpd = PitchKeypointDetector("models/old/pitch_keypoint_detector.pt")
     ViewTransformer(kpd).add_transformed_position_to_tracks(tracks, frames)
-
-    tracks["ball"] = tr.interpolate_ball_positions(tracks["ball"])
 
     SpeedDistanceEstimator().add_speed_and_distance_to_tracks(tracks, fps=vid_fps)
 

@@ -49,7 +49,7 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
     log(f"Loaded {len(video_frames)} frames from {Path(video_path).name}")
 
     cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS) or 24
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25
     cap.release()
 
     import torch
@@ -63,8 +63,12 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
     tracks = tracker.get_object_tracks(
         video_frames, read_from_stub=True,
         stub_path=str(CACHE_DIR / f"{stub_key}_track.pkl"))
-    tracker.add_position_to_tracks(tracks)
     log(f"Tracking done — {len(tracks['players'])} frames")
+
+    log("Interpolating ball & player positions...")
+    tracks['ball'] = tracker.interpolate_ball_positions(tracks['ball'])
+    tracks['players'] = tracker.interpolate_player_positions(tracks['players'])
+    tracker.add_position_to_tracks(tracks)
 
     log("Estimating camera movement...")
     progress(0.15, desc="Camera estimation...")
@@ -74,14 +78,12 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
         stub_path=str(CACHE_DIR / f"{stub_key}_cam.pkl"))
     cam_est.add_adjust_positions_to_tracks(tracks, cam_move)
 
-    log("Computing homography & interpolating...")
+    log("Computing homography...")
     progress(0.25, desc="Pitch keypoints -> homography...")
     kp_detector = PitchKeypointDetector(
         model_path="models/pitch_keypoint_detector.pt")
     vt = ViewTransformer(kp_detector)
     vt.add_transformed_position_to_tracks(tracks, video_frames)
-    tracks["ball"] = tracker.interpolate_ball_positions(tracks["ball"])
-    tracks["players"] = tracker.interpolate_player_positions(tracks["players"])
 
     sde = SpeedDistanceEstimator()
     sde.add_speed_and_distance_to_tracks(tracks, fps=fps)
@@ -178,17 +180,20 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
                             (pos[0], pos[1] + 20),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
 
-        # Team ball control (top-left, below camera movement)
+        # Team ball control (top-right)
         t1 = int(np.sum(team_ball_control[:fn + 1] == 1))
         t2 = int(np.sum(team_ball_control[:fn + 1] == 2))
         tot = t1 + t2 + 1e-6
         bc_ov = frame.copy()
-        cv2.rectangle(bc_ov, (10, 110), (310, 200), (255, 255, 255), -1)
+        cv2.rectangle(bc_ov, (w - 310, 10), (w - 10, 100),
+                      (255, 255, 255), -1)
         cv2.addWeighted(bc_ov, 0.4, frame, 0.6, 0, frame)
         cv2.putText(frame, f"Team1: {t1 / tot * 100:.0f}%",
-                    (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+                    (w - 290, 50), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8, (0, 0, 0), 2)
         cv2.putText(frame, f"Team2: {t2 / tot * 100:.0f}%",
-                    (30, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+                    (w - 290, 80), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8, (0, 0, 0), 2)
 
         # Formation overlay (bottom-left)
         cv2.putText(frame, f"Team 1: {n1}", (10, h - 80),
