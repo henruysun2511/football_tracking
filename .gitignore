@@ -21,8 +21,9 @@ models/**/*.pt
 models/**/*.pth
 models/**/*.engine
 
-# Outputs
-output_videos/
+# Outputs — only allow gif files
+output_videos/*
+!output_videos/**/*.gif
 runs/
 test_output/
 

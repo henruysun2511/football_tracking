@@ -21,6 +21,10 @@ Kiến trúc pipeline gồm 2 pha:
 - **Heatmap**: Ảnh nhiệt mật độ di chuyển (630x420) cho từng đội và tổng hợp.
 - **Web UI (Gradio/Streamlit)**: Upload video, xem kết quả, log thời gian thực.
 
+<p align="center">
+  <img src="output_videos/demo.gif" width="800">
+</p>
+
 ## Cấu Trúc Dự Án
 
 ```
@@ -235,11 +239,9 @@ python analysis/capture_result_frame.py
 
 Sau khi chạy pipeline, video kết quả với đầy đủ annotation được lưu tại `output_videos/output-5.mp4`:
 
-<video controls width="100%">
-  <source src="https://github.com/henruysun2511/football_tracking/raw/main/output_videos/output-5.mp4" type="video/mp4">
-  Trình duyệt của bạn không hỗ trợ phát video trực tiếp.
-  <a href="https://github.com/henruysun2511/football_tracking/raw/main/output_videos/output-5.mp4">Tải video</a>.
-</video>
+<p align="center">
+  <img src="output_videos/demo.gif" width="800">
+</p>
 
 *Video demo gồm: ellipse cầu thủ (màu theo đội) + ID, triangle bóng, camera movement overlay, speed/distance text, tỉ lệ kiểm soát bóng, đội hình chiến thuật, minimap tactical 2D.*
 
