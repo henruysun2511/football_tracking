@@ -27,11 +27,11 @@ def save_video(frames, output_path, fps=24):
     for frame in frames:
         out.write(frame)
     out.release()
-    # Re-encode to H.264 via ffmpeg
     try:
         subprocess.run(
             ['ffmpeg', '-y', '-i', tmp_path,
              '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+             '-movflags', '+faststart',
              output_path],
             capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):

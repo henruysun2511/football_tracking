@@ -6,7 +6,6 @@ from ultralytics.nn.modules.head import Detect
 # Khởi tạo model
 model = YOLO('models/pitch_keypoint_detector.pt')
 
-# Fix version mismatch: older training code missing `detect` attribute
 head = model.model.model[-1]
 if not hasattr(head, 'detect'):
     head.detect = Detect.forward

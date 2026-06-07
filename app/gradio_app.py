@@ -196,10 +196,13 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
                     0.8, (0, 0, 0), 2)
 
         # Formation overlay (bottom-left)
-        cv2.putText(frame, f"Team 1: {n1}", (10, h - 80),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-        cv2.putText(frame, f"Team 2: {n2}", (10, h - 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        fm_ov = frame.copy()
+        cv2.rectangle(fm_ov, (10, h - 110), (310, h - 20), (255, 255, 255), -1)
+        cv2.addWeighted(fm_ov, 0.4, frame, 0.6, 0, frame)
+        cv2.putText(frame, f"Team1 Formation: {n1}",
+                    (30, h - 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+        cv2.putText(frame, f"Team2 Formation: {n2}",
+                    (30, h - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
 
         # Pitch keypoints + minimap
         if show_keypoints:

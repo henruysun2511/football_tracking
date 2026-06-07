@@ -192,10 +192,13 @@ def phase2_render(video_frames, tracks, cam_move,
                     (30, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
 
         # Formation
-        cv2.putText(frame, f"Team 1: {n1}", (10, h - 80),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-        cv2.putText(frame, f"Team 2: {n2}", (10, h - 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        fm_ov = frame.copy()
+        cv2.rectangle(fm_ov, (10, h - 110), (310, h - 20), (255, 255, 255), -1)
+        cv2.addWeighted(fm_ov, 0.4, frame, 0.6, 0, frame)
+        cv2.putText(frame, f"Team1 Formation: {n1}",
+                    (30, h - 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+        cv2.putText(frame, f"Team2 Formation: {n2}",
+                    (30, h - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
 
         # Keypoints + minimap
         kps = kp_detector.detect_smoothed(video_frames[frame_num])

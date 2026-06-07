@@ -62,7 +62,7 @@ class MinimapRenderer:
 
         return img
 
-    def render(self, tracks, frame_num, jersey_numbers=None,
+    def render(self, tracks, frame_num,
                team_colors=None):
         minimap = self._draw_pitch()
 
@@ -72,10 +72,6 @@ class MinimapRenderer:
         ]:
             for tid, data in tracks[obj][frame_num].items():
                 pos = data.get('position_transformed')
-                if pos is None:
-                    pos = data.get('position_adjusted')
-                if pos is None:
-                    pos = data.get('position')
                 if pos is None:
                     continue
                 x, y = self._pitch_to_minimap(pos)
@@ -87,21 +83,11 @@ class MinimapRenderer:
                         c = data.get('team_color', (0, 0, 255))
                     cv2.circle(minimap, (x, y), 4, c, -1)
                     cv2.circle(minimap, (x, y), 4, (255, 255, 255), 1)
-
-                    if jersey_numbers and tid in jersey_numbers:
-                        jnum = str(jersey_numbers[tid])
-                        cv2.putText(minimap, jnum, (x - 5, y - 6),
-                                    cv2.FONT_HERSHEY_SIMPLEX,
-                                    0.3, (255, 255, 255), 1)
                 else:
                     cv2.circle(minimap, (x, y), 3, color, -1)
 
         if 1 in tracks['ball'][frame_num]:
             pos = tracks['ball'][frame_num][1].get('position_transformed')
-            if pos is None:
-                pos = tracks['ball'][frame_num][1].get('position_adjusted')
-            if pos is None:
-                pos = tracks['ball'][frame_num][1].get('position')
             if pos:
                 x, y = self._pitch_to_minimap(pos)
                 cv2.circle(minimap, (x, y), 3, (0, 255, 255), -1)
