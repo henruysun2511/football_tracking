@@ -997,6 +997,8 @@ Danh sách file trong `analysis/figures/`:
 
 ---
 
+## 4. ĐẶC TẢ DỮ LIỆU
+
 ### 4.1 Schema của Tracks Dictionary
 
 ```python
@@ -1235,7 +1237,174 @@ football_tracking/
 
 ---
 
-## 7. SƠ ĐỒ LUỒNG DỮ LIỆU
+## 7. SƠ ĐỒ TỔNG THỂ TOÀN DỰ ÁN
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                     DATA PREPARATION (chuẩn bị dữ liệu)                    │
+└────────────────────────────────────────────────────────────────────────────┘
+
+  Roboflow API (football-players-detection-3zvbc) ───┐
+  Roboflow API (football-field-detection-f07vi)   ───┤
+                                                     ▼
+                    ┌─────────────────────────────────────────────┐
+                    │       Download Dataset                      │
+                    │  player_dataset.py                          │
+                    │  pitch_keypoint_dataset.py                  │
+                    │  -> datasets/*-detection-2/                 │
+                    └────────────┬────────────────────────────────┘
+                                 ▼
+                    ┌─────────────────────────────────────────────┐
+                    │       Cleaning Dataset                      │
+                    │  player_cleaning.py                         │
+                    │    - scan_split() -> phát hiện 5 loại lỗi   │
+                    │    - clean_split() -> copy ảnh sạch         │
+                    │    - fix_bbox_labels() -> clip tọa độ       │
+                    │  pitch_keypoint_cleaning.py                 │
+                    │    - scan_keypoint_split()                  │
+                    │    - fix_and_copy_keypoint_split()          │
+                    │  -> datasets/*-cleaned/                     │
+                    └────────────┬────────────────────────────────┘
+                                 ▼
+                    ┌─────────────────────────────────────────────┐
+                    │       Training (Huấn luyện)                 │
+                    │  football_training.py                       │
+                    │    - YOLOv8x, imgsz=1280, epochs=100        │
+                    │    - batch=8, patience=20                   │
+                    │    -> models/player_detector.pt             │
+                    │  pitch_keypoint_training.py                 │
+                    │    - YOLOv8x-pose, imgsz=640, epochs=100    │
+                    │    - batch=8, patience=50, mosaic=1.0       │
+                    │    -> models/pitch_keypoint_detector.pt     │
+                    └────────────┬────────────────────────────────┘
+                                 │
+                                 ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │                MAIN INFERENCE PIPELINE (main.py)                      │
+  └────────────────────────────────────────────────────────────────────────┘
+
+  [Input Video: .mp4 / .avi]
+         │
+         ▼
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  PHA 1 — TRACKING                                                  │
+  │                                                                    │
+  │  read_video() ──────────────────────────► frames: list[np.array]   │
+  │         │                                                          │
+  │         ▼                                                          │
+  │  Tracker.get_object_tracks()                                       │
+  │    ├── YOLOv8x (models/player_detector.pt)                         │
+  │    │    detect_frames(batch_size=20, conf=0.1)                     │
+  │    └── ByteTrack (track_activation=0.25, lost_buffer=30)          │
+  │         │                                                          │
+  │         ▼                                                          │
+  │  CameraMovementEstimator                                           │
+  │    └── Lucas-Kanade Optical Flow (biên trái/phải)                 │
+  │         │                                                          │
+  │         ▼                                                          │
+  │  PitchKeypointDetector + ViewTransformer                           │
+  │    ├── detect_smoothed() -> 32 keypoints                           │
+  │    ├── get_homography() -> ma trận H                               │
+  │    └── perspectiveTransform() -> tọa độ sân thực (cm)             │
+  │         │                                                          │
+  │         ▼                                                          │
+  │  SpeedDistanceEstimator                                            │
+  │    └── window=5 frames, max=38km/h                                │
+  │         │                                                          │
+  │         ▼                                                          │
+  │  TeamAssigner                                                      │
+  │    └── K-Means trên màu áo (2 cụm)                                │
+  │         │                                                          │
+  │         ▼                                                          │
+  │  PlayerBallAssigner                                                │
+  │    └── khoảng cách <= 70px                                         │
+  │         │                                                          │
+  │         ▼                                                          │
+  │  Save stubs:                                                       │
+  │    ├── stubs/tracks_full.pkl                                       │
+  │    ├── stubs/cam_move.pkl                                          │
+  │    └── stubs/team_ball_control.npy                                 │
+  └─────────────────┬──────────────────────────────────────────────────┘
+                    │
+                    ▼
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  PHA 2 — RENDERING                                                 │
+  │                                                                    │
+  │  Load stubs                                                        │
+  │    └── tracks_full.pkl + cam_move.pkl + team_ball_control.npy     │
+  │         │                                                          │
+  │         ▼                                                          │
+  │  FormationAnalyzer                                                 │
+  │    └── K-Means (3-4 cụm) + bỏ phiếu -> 4-3-3, 4-4-2...          │
+  │         │                                                          │
+  │         ▼                                                          │
+  │  Với mỗi frame:                                                    │
+  │    ├── Vẽ ellipse cầu thủ (màu theo đội) + ID                     │
+  │    ├── Vẽ triangle bóng (cyan) + người cầm bóng (xanh)            │
+  │    ├── Vẽ ellipse trọng tài (vàng)                                │
+  │    ├── Vẽ camera movement overlay (góc trên trái)                  │
+  │    ├── Vẽ speed + distance text (dưới chân)                       │
+  │    ├── Vẽ team ball control % (góc trên trái)                     │
+  │    ├── Vẽ formation labels (góc dưới trái)                        │
+  │    ├── Vẽ pitch keypoints (tùy chọn)                              │
+  │    ├── MinimapRenderer -> overlay góc dưới phải (tùy chọn)       │
+  │    └── Append vào output_frames                                    │
+  │         │                                                          │
+  │         ▼                                                          │
+  │  save_video()                                                      │
+  │    └── ffmpeg H.264 (.mp4) / fallback OpenCV (.avi)               │
+  │         │                                                          │
+  │         ▼                                                          │
+  │  HeatmapGenerator                                                  │
+  │    └── render_both()  -> output_videos/heatmap_both.png           │
+  │    └── render_team(1) -> output_videos/heatmap_team1.png          │
+  │    └── render_team(2) -> output_videos/heatmap_team2.png          │
+  └─────────────────┬──────────────────────────────────────────────────┘
+                    │
+                    ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │                       WEB UI (Giao diện web)                         │
+  └────────────────────────────────────────────────────────────────────────┘
+
+  Gradio (app/gradio_app.py)               Streamlit (app/streamlit_app.py)
+    ├── Upload video input                    ├── Upload video input
+    ├── Checkbox: keypoints / minimap         ├── Tùy chọn rendering
+    ├── Checkbox: heatmap                     └── Hiển thị kết quả
+    ├── Nút Analyze
+    ├── Video output + Gallery heatmap
+    ├── Status log (real-time terminal)
+    └── Cache stub bằng MD5 hash
+
+
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │                   ANALYSIS & VISUALIZATION                           │
+  └────────────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────┐   ┌──────────────────────┐   ┌──────────────────┐
+  │ DATASET EDA         │   │ PIPELINE COMPONENT    │   │ KẾT QUẢ & STATS  │
+  ├─────────────────────┤   ├──────────────────────┤   ├──────────────────┤
+  │ eda_dataset.py      │   │ visualize_perspective │   │ player_stats.py  │
+  │  -> dataset_eda.png │   │  -> perspective.png   │   │  -> stats.png    │
+  │                     │   │                       │   │                  │
+  │ class_imbalance.py  │   │ visualize_optical_flow│   │ training_results │
+  │  -> imbalance.png   │   │  -> optical_flow.png  │   │  -> results.png  │
+  │                     │   │                       │   │                  │
+  │ check_quality.py    │   │ ball_interpolation.py │   │ capture_frame.py │
+  │  -> quality_report  │   │  -> ball_interp.png   │   │  -> showcase.png │
+  │                     │   │                       │   │                  │
+  │ verify_split.py     │   │ team_assignment.py    │   │                  │
+  │  -> data_split.png  │   │  -> kmeans_team.png   │   │                  │
+  └─────────────────────┘   └──────────────────────┘   └──────────────────┘
+
+  ┌───────────────────────────────────────────────────────────────┐
+  │ LABELING & AUGMENTATION                                       │
+  ├───────────────────────────────────────────────────────────────┤
+  │ visualize_label_format.py -> label_format_explanation.png    │
+  │ visualize_preprocessing.py  -> augmentation_comparison.png   │
+  │                             -> labeled_sample.png             │
+  │ visualize_mosaic_augmentation.py -> mosaic_augmentation.png  │
+  └───────────────────────────────────────────────────────────────┘
+```
 
 ### 7.1 Pipeline Tracking (Pha 1)
 
