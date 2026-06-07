@@ -235,9 +235,10 @@ python analysis/capture_result_frame.py
 
 Sau khi chạy pipeline, video kết quả với đầy đủ annotation được lưu tại `output_videos/output-5.mp4`:
 
-<video controls width="100%" src="output_videos/output-5.mp4">
+<video controls width="100%">
+  <source src="https://github.com/henruysun2511/football_tracking/raw/main/output_videos/output-5.mp4" type="video/mp4">
   Trình duyệt của bạn không hỗ trợ phát video trực tiếp.
-  Tải video tại <a href="output_videos/output-5.mp4">output_videos/output-5.mp4</a>.
+  <a href="https://github.com/henruysun2511/football_tracking/raw/main/output_videos/output-5.mp4">Tải video</a>.
 </video>
 
 *Video demo gồm: ellipse cầu thủ (màu theo đội) + ID, triangle bóng, camera movement overlay, speed/distance text, tỉ lệ kiểm soát bóng, đội hình chiến thuật, minimap tactical 2D.*
