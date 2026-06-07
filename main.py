@@ -14,7 +14,6 @@ from pitch_keypoint_detector.pitch_keypoint_detector import PitchKeypointDetecto
 from heatmap_generator.heatmap_generator import HeatmapGenerator
 from minimap.minimap_renderer import MinimapRenderer
 from formations import detect_team_formation
-# from ocr import read_jersey_number, draw_jersey_number  # temporarily disabled
 
 
 STUB_DIR = 'stubs'
@@ -24,7 +23,7 @@ def phase1_tracking(video_path='input_videos/sample.mp4'):
     video_frames = read_video(video_path)
     print(f"Loaded {len(video_frames)} frames from {video_path}")
     cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS) or 24
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25
     cap.release()
 
     tracker = Tracker('models/player_detector.pt')
@@ -32,8 +31,16 @@ def phase1_tracking(video_path='input_videos/sample.mp4'):
         video_frames,
         read_from_stub=True,
         stub_path=f'{STUB_DIR}/track_stubs.pkl')
+
+    # ✅ Thứ tự đúng:
+    # 1. Interpolate trước để fill gap bbox
+    tracks['ball'] = tracker.interpolate_ball_positions(tracks['ball'])
+    tracks['players'] = tracker.interpolate_player_positions(tracks['players'])
+
+    # 2. Add position (foot point) sau khi đã có đủ bbox
     tracker.add_position_to_tracks(tracks)
 
+    # 3. Camera movement → position_adjusted
     cam_est = CameraMovementEstimator(video_frames[0])
     cam_move = cam_est.get_camera_movement(
         video_frames,
@@ -41,14 +48,13 @@ def phase1_tracking(video_path='input_videos/sample.mp4'):
         stub_path=f'{STUB_DIR}/camera_movement_stub.pkl')
     cam_est.add_adjust_positions_to_tracks(tracks, cam_move)
 
+    # 4. Homography dùng position_adjusted
     kp_detector = PitchKeypointDetector(
         model_path='models/pitch_keypoint_detector.pt')
     vt = ViewTransformer(kp_detector)
     vt.add_transformed_position_to_tracks(tracks, video_frames)
 
-    tracks['ball'] = tracker.interpolate_ball_positions(tracks['ball'])
-    tracks['players'] = tracker.interpolate_player_positions(tracks['players'])
-
+    # 5. Speed sau khi đã có position_transformed đầy đủ
     sde = SpeedDistanceEstimator()
     sde.add_speed_and_distance_to_tracks(tracks, fps=fps)
 
@@ -88,7 +94,7 @@ def phase1_tracking(video_path='input_videos/sample.mp4'):
 
 
 def phase2_render(video_frames, tracks, cam_move,
-                  team_ball_control, team_assigner, fps=30):
+                  team_ball_control, team_assigner, fps=25):
     print("Phase 2: Rendering...")
     import torch
     if torch.cuda.is_available():
@@ -118,7 +124,6 @@ def phase2_render(video_frames, tracks, cam_move,
 
     total = len(video_frames)
 
-    # Detect formations
     f1, n1, c1 = detect_team_formation(
         tracks, 1, frame_nums=range(0, total, 30), method='kmeans')
     f2, n2, c2 = detect_team_formation(
@@ -131,29 +136,28 @@ def phase2_render(video_frames, tracks, cam_move,
             print(f"Rendering frame {frame_num}/{total}...")
         frame = video_frames[frame_num].copy()
 
-        # draw annotations (inline để không tạo list trung gian)
         for tid, data in tracks["players"][frame_num].items():
-            color = data.get("team_color", (0,255,0))
+            color = data.get("team_color", (0, 255, 0))
             frame = tracker.draw_ellipse(frame, data["bbox"], color, tid)
             if data.get("has_ball"):
-                frame = tracker.draw_triangle(frame, data["bbox"], (0,255,0))
+                frame = tracker.draw_triangle(frame, data["bbox"], (0, 255, 0))
         for tid, data in tracks["referees"][frame_num].items():
-            frame = tracker.draw_ellipse(frame, data["bbox"], (255,255,0), tid)
+            frame = tracker.draw_ellipse(frame, data["bbox"], (255, 255, 0), tid)
         if 1 in tracks["ball"][frame_num]:
-            frame = tracker.draw_triangle(frame,
-                tracks["ball"][frame_num][1]["bbox"], (0,255,255))
+            frame = tracker.draw_triangle(
+                frame, tracks["ball"][frame_num][1]["bbox"], (0, 255, 255))
 
-        # camera movement
+        # Camera movement
         overlay = frame.copy()
-        cv2.rectangle(overlay, (0,0), (500,100), (255,255,255), -1)
+        cv2.rectangle(overlay, (0, 0), (500, 100), (255, 255, 255), -1)
         cv2.addWeighted(overlay, 0.2, frame, 0.8, 0, frame)
         dx, dy = cam_move[frame_num]
-        cv2.putText(frame, "Camera Movement", (10,30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 3)
-        cv2.putText(frame, f"X: {dx:.1f}  Y: {dy:.1f}", (10,70),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 3)
+        cv2.putText(frame, "Camera Movement", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+        cv2.putText(frame, f"X: {dx:.1f}  Y: {dy:.1f}", (10, 70),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
 
-        # speed / distance (below foot — reference style)
+        # Speed / distance — white text với outline đen
         for tid, data in tracks["players"][frame_num].items():
             spd = data.get("speed")
             dst = data.get("distance")
@@ -163,50 +167,50 @@ def phase2_render(video_frames, tracks, cam_move,
             pos = list(get_foot_position(bbox))
             pos[1] += 40
             pos = tuple(map(int, pos))
+            # Vẽ outline đen trước, chữ trắng sau
             cv2.putText(frame, f"{spd:.1f} km/h", pos,
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5, (0, 0, 0), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 3)
+            cv2.putText(frame, f"{spd:.1f} km/h", pos,
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             if dst is not None:
-                cv2.putText(frame, f"{dst:.2f} m",
-                            (pos[0], pos[1] + 20),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.5, (0, 0, 0), 2)
+                pos2 = (pos[0], pos[1] + 20)
+                cv2.putText(frame, f"{dst:.1f} m", pos2,
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 3)
+                cv2.putText(frame, f"{dst:.1f} m", pos2,
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
-        # team ball control (top-left, below camera movement)
-        t1 = int(np.sum(team_ball_control[:frame_num+1] == 1))
-        t2 = int(np.sum(team_ball_control[:frame_num+1] == 2))
+        # Team ball control
+        t1 = int(np.sum(team_ball_control[:frame_num + 1] == 1))
+        t2 = int(np.sum(team_ball_control[:frame_num + 1] == 2))
         tot = t1 + t2 + 1e-6
         bc_ov = frame.copy()
-        cv2.rectangle(bc_ov, (10, 110), (310, 200),
-                      (255, 255, 255), -1)
+        cv2.rectangle(bc_ov, (10, 110), (310, 200), (255, 255, 255), -1)
         cv2.addWeighted(bc_ov, 0.4, frame, 0.6, 0, frame)
         cv2.putText(frame, f"Team1: {t1/tot*100:.0f}%",
-                    (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2)
+                    (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
         cv2.putText(frame, f"Team2: {t2/tot*100:.0f}%",
-                    (30, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,0), 2)
+                    (30, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
 
-        # formation overlay
-        cv2.putText(frame, f"Team 1: {n1}", (10, h-80),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,0,0), 2)
-        cv2.putText(frame, f"Team 2: {n2}", (10, h-50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2)
+        # Formation
+        cv2.putText(frame, f"Team 1: {n1}", (10, h - 80),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+        cv2.putText(frame, f"Team 2: {n2}", (10, h - 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-        # keypoints + minimap
+        # Keypoints + minimap
         kps = kp_detector.detect_smoothed(video_frames[frame_num])
         if kps is not None:
             frame = kp_detector.draw_keypoints(frame, kps)
         minimap = minimap_renderer.render(
             tracks, frame_num, team_colors=team_colors)
-        frame = minimap_renderer.overlay(
-            frame, minimap, pos='bottom_right')
+        frame = minimap_renderer.overlay(frame, minimap, pos='bottom_right')
 
         out_writer.write(frame)
 
     out_writer.release()
     print("Saved: output_videos/output_enhanced.avi")
 
-    cv2.imwrite('output_videos/heatmap_both.png',
-                heatmap_gen.render_both())
+    cv2.imwrite('output_videos/heatmap_both.png', heatmap_gen.render_both())
     cv2.imwrite('output_videos/heatmap_team1.png',
                 heatmap_gen.render_team(1, cv2.COLORMAP_WINTER))
     cv2.imwrite('output_videos/heatmap_team2.png',
@@ -224,7 +228,7 @@ def phase2_render_from_stubs(video_path='input_videos/sample.mp4'):
     video_frames = read_video(video_path)
 
     cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25
     cap.release()
 
     team_assigner = TeamAssigner()
@@ -254,6 +258,6 @@ if __name__ == '__main__':
     else:
         vf, tr, cm, tbc, ta = phase1_tracking(args.video)
         cap = cv2.VideoCapture(args.video)
-        fps = cap.get(cv2.CAP_PROP_FPS) or 30
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25
         cap.release()
         phase2_render(vf, tr, cm, tbc, ta, fps=fps)
