@@ -45,6 +45,10 @@ class ViewTransformer:
         prev = self._pos_smooth[key]
         if not self._is_valid(raw):
             return list(prev)
+        max_j = self._max_jump.get(obj_type, 400)
+        dist  = np.linalg.norm(np.array(raw) - np.array(prev))
+        if dist > max_j:
+            return list(prev)
         a        = self.smooth_alpha
         smoothed = (a * np.array(raw) + (1 - a) * np.array(prev)).tolist()
         self._pos_smooth[key] = smoothed
@@ -63,9 +67,9 @@ class ViewTransformer:
                     continue
 
                 for tid, data in frame_track.items():
-                    # ✅ Sử dụng trực tiếp position thay vì position_adjusted
-                    # vì homography matrix M đã bao gồm camera movement
-                    pos = data.get('position')
+                    # ✅ Ưu tiên position_adjusted (đã trừ camera movement)
+                    # Fallback về position nếu chưa có
+                    pos = data.get('position_adjusted') or data.get('position')
                     if pos is None:
                         continue
                     try:
