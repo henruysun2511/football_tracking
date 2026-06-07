@@ -254,7 +254,7 @@ def visualize_keypoint_stats(all_kp_vis_count, all_kp_per_image,
     out = f"analysis/figures/pitch_keypoint_stats_{split}.png"
     plt.savefig(out, dpi=150, bbox_inches='tight')
     plt.show()
-    print(f"✅ Saved: {out}")
+    print(f"Saved: {out}")
 
 
 def visualize_keypoints_on_image(split="train", n=4):
@@ -332,10 +332,8 @@ def visualize_keypoints_on_image(split="train", n=4):
     out = "analysis/figures/pitch_keypoint_before_after.png"
     plt.savefig(out, dpi=150, bbox_inches='tight')
     plt.show()
-    print(f"✅ Saved: {out}")
+    print(f"Saved: {out}")
 
-
-# ── MAIN ──────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     print("=" * 55)
@@ -360,12 +358,12 @@ if __name__ == "__main__":
                 print(f"  {k:<25}: {v}")
 
     # Bước 2: Fix + copy
-    print("\n🧹 Fix và copy dữ liệu sạch...")
+    print("\nFix và copy dữ liệu sạch...")
     for split in SPLITS:
         fix_and_copy_keypoint_split(split, all_bad[split])
 
     # Bước 3: Visualize
-    print("\n📊 Visualize thống kê...")
+    print("\nVisualize thống kê...")
     visualize_keypoint_stats(all_kp_vis, all_kp_img, split="train")
     visualize_keypoints_on_image(split="train", n=4)
 
@@ -378,4 +376,4 @@ if __name__ == "__main__":
         a = len(list((Path(CLEANED_ROOT)/split/"images").glob("*.jpg")))
         print(f"{split:<8} {b:>8} {a:>8} {b-a:>8}")
     print("=" * 55)
-    print(f"✅ Dataset sạch lưu tại: {CLEANED_ROOT}")
+    print(f"Dataset sạch lưu tại: {CLEANED_ROOT}")
