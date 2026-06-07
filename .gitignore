@@ -27,12 +27,16 @@ runs/
 test_output/
 
 # Cache / Stubs (generated)
-stubs/
-cache/
-cache_gradio/
+# stubs/
+# cache/
+# cache_gradio/
 
-# Input videos (user-provided, large)
-input_videos/
+# Input videos — keep folder, ignore video files
+input_videos/*.mp4
+input_videos/*.avi
+input_videos/*.mov
+input_videos/*.mkv
+input_videos/*.webm
 
 # IDE
 .vscode/
