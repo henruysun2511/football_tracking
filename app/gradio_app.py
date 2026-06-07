@@ -234,19 +234,50 @@ def process_video(video_path, show_keypoints, show_minimap, show_heatmap,
         heatmap_paths.append(hm2_path)
         log("Saved heatmaps")
 
+    # Extract stats
+    import pandas as pd
+    player_stats = {}
+    for pt in tracks["players"]:
+        for pid, pd_data in pt.items():
+            if pid not in player_stats:
+                player_stats[pid] = {"Max Speed (km/h)": 0.0, "Distance (m)": 0.0, "Team": pd_data.get("team", 1)}
+            spd = pd_data.get("speed")
+            dst = pd_data.get("distance")
+            if spd is not None and spd > player_stats[pid]["Max Speed (km/h)"]:
+                player_stats[pid]["Max Speed (km/h)"] = spd
+            if dst is not None and dst > player_stats[pid]["Distance (m)"]:
+                player_stats[pid]["Distance (m)"] = dst
+
+    df_players = pd.DataFrame.from_dict(player_stats, orient='index').reset_index()
+    df_players.rename(columns={"index": "Player ID"}, inplace=True)
+    df_players["Max Speed (km/h)"] = df_players["Max Speed (km/h)"].round(1)
+    df_players["Distance (m)"] = df_players["Distance (m)"].round(1)
+
+    top_speed = df_players.sort_values(by="Max Speed (km/h)", ascending=False).head(5)
+    top_dist = df_players.sort_values(by="Distance (m)", ascending=False).head(5)
+
+    match_stats = f"""
+### Match Statistics
+- **Team 1 Formation:** {n1} | **Ball Control:** {t1/tot*100:.0f}%
+- **Team 2 Formation:** {n2} | **Ball Control:** {t2/tot*100:.0f}%
+    """
+
     progress(1.0, desc="Done!")
     log("Processing complete!")
-    return out_path, heatmap_paths if heatmap_paths else None
+    return out_path, heatmap_paths if heatmap_paths else None, match_stats, top_speed, top_dist
 
 
 def video_ui(file, show_kp, show_mm, show_hm, progress=gr.Progress()):
     if file is None:
-        return None, None, log("No file uploaded")
+        return None, None, "", None, None, log("No file uploaded")
     video_path = file
     try:
-        out_vid, hm_paths = process_video(
+        out_vid, hm_paths, match_stats, top_speed, top_dist = process_video(
             video_path, show_kp, show_mm, show_hm, progress)
-        return out_vid, hm_paths, log("Done!")
+        
+        return (out_vid, 
+                gr.update(value=hm_paths, visible=True) if hm_paths else gr.update(visible=False), 
+                match_stats, top_speed, top_dist, log("Done!"))
     except Exception as e:
         err = traceback.format_exc()
         log(f"ERROR: {e}")
@@ -272,15 +303,24 @@ with gr.Blocks(title="Football AI Analysis", css="""
             btn = gr.Button("Analyze", variant="primary")
         with gr.Column(scale=2):
             video_output = gr.Video(label="Result", format="mp4")
-            heatmap_gallery = gr.Gallery(label="Heatmaps", columns=3,
-                                         visible=False)
-            status_log = gr.HTML(value="<div id='log-box'>Waiting...</div>",
-                                 label="Status Log")
+            
+            # --- New Statistics Section ---
+            stats_markdown = gr.Markdown("### Match Statistics\n*(Waiting for analysis...)*")
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("#### Top 5 Players by Speed")
+                    top_speed_df = gr.Dataframe(headers=["Player ID", "Max Speed (km/h)", "Distance (m)", "Team"])
+                with gr.Column():
+                    gr.Markdown("#### Top 5 Players by Distance")
+                    top_dist_df = gr.Dataframe(headers=["Player ID", "Max Speed (km/h)", "Distance (m)", "Team"])
+            
+            heatmap_gallery = gr.Gallery(label="Heatmaps", columns=3, visible=False)
+            status_log = gr.HTML(value="<div id='log-box'>Waiting...</div>", label="Status Log")
 
     btn.click(
         fn=video_ui,
         inputs=[video_input, show_kp, show_mm, show_hm],
-        outputs=[video_output, heatmap_gallery, status_log],
+        outputs=[video_output, heatmap_gallery, stats_markdown, top_speed_df, top_dist_df, status_log],
     )
 
 
