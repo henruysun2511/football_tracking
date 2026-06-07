@@ -229,6 +229,53 @@ python analysis/capture_result_frame.py
 | Heatmap size | 630 x 420 px |
 | Minimap size | 350 x 230 px |
 
+## Kết Quả Demo
+
+### Video đầu ra
+
+Sau khi chạy pipeline, video kết quả với đầy đủ annotation được lưu tại `output_videos/output-5.mp4`:
+
+<video controls width="100%" src="output_videos/output-5.mp4">
+  Trình duyệt của bạn không hỗ trợ phát video trực tiếp.
+  Tải video tại <a href="output_videos/output-5.mp4">output_videos/output-5.mp4</a>.
+</video>
+
+*Video demo gồm: ellipse cầu thủ (màu theo đội) + ID, triangle bóng, camera movement overlay, speed/distance text, tỉ lệ kiểm soát bóng, đội hình chiến thuật, minimap tactical 2D.*
+
+### Ảnh kết quả
+
+Các ảnh chụp từ video và biểu đồ phân tích được lưu trong `analysis/figures/`:
+
+![Result Showcase](analysis/figures/result_showcase.png)
+*6 frame kết quả cách đều nhau, hiển thị các lớp annotation trên sân.*
+
+![Perspective Transform](analysis/figures/perspective_transform.png)
+*Phép biến đổi phối cảnh từ góc camera sang góc nhìn bird's eye.*
+
+![Optical Flow](analysis/figures/optical_flow.png)
+*Ước lượng chuyển động camera bằng Lucas-Kanade Optical Flow.*
+
+![Ball Interpolation](analysis/figures/ball_interpolation.png)
+*Nội suy vị trí bóng bằng Pandas — trước và sau interpolation.*
+
+![Player Stats](analysis/figures/player_stats.png)
+*Thống kê tốc độ tối đa, tốc độ trung bình và quãng đường di chuyển của cầu thủ.*
+
+![K-Means Team Assignment](analysis/figures/kmeans_team_assignment.png)
+*Phân tách màu áo cầu thủ bằng K-Means clustering để gán đội.*
+
+![Training Results](analysis/figures/training_results.png)
+*Biểu đồ huấn luyện: loss, mAP, precision, recall.*
+
+![Mosaic Augmentation](analysis/figures/mosaic_augmentation.png)
+*Kỹ thuật Mosaic Augmentation: ghép 4 ảnh thành 1 training sample.*
+
+![Dataset EDA](analysis/figures/dataset_eda.png)
+*EDA tổng quan dataset: phân bố class, split distribution, kích thước bbox.*
+
+![Class Imbalance](analysis/figures/class_imbalance.png)
+*Phân tích mất cân bằng dữ liệu giữa các class.*
+
 ## Lưu Ý
 
 - Cache stub dùng MD5 hash nội dung file để tránh xử lý lại khi upload file trùng qua Gradio
