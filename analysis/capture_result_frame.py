@@ -6,7 +6,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
-VIDEO_PATH = 'output_videos/output_enhanced.avi'
+VIDEO_PATH = 'output_videos/output-5.mp4'
 if not os.path.exists(VIDEO_PATH):
     print(f"No output video found at {VIDEO_PATH}. Run main.py first.")
     exit(0)
