@@ -2,14 +2,9 @@ import cv2
 import numpy as np
 from utils import measure_distance
 
-# SoccerPitchConfig: length=12000, width=7000 → đơn vị cm
 _UNIT_TO_METER = 0.01   # cm → m
-
-# Giới hạn sinh lý học
-_MAX_SPEED_KMH = 38.0   # Mbappé ~38 km/h
-# Max distance trong 1 window = WINDOW/fps giây
-# WINDOW=5, fps=25 → 0.2s → max 12m/s × 0.2s = 2.4m = 240cm, dùng 300cm buffer
-_MAX_DIST_CM = 300.0
+_MAX_SPEED_KMH = 38.0
+_MAX_DIST_CM   = 300.0
 
 
 class SpeedDistanceEstimator:
@@ -22,45 +17,57 @@ class SpeedDistanceEstimator:
                 continue
 
             n_frames = len(obj_tracks)
-            for start in range(0, n_frames, self.WINDOW):
-                end = min(start + self.WINDOW, n_frames - 1)
-                if end == start:
-                    continue
 
-                tids = set()
-                for fn in range(start, end + 1):
-                    tids.update(obj_tracks[fn].keys())
+            # Tập hợp tất cả tid xuất hiện trong toàn bộ video
+            all_tids = set()
+            for fd in obj_tracks:
+                all_tids.update(fd.keys())
 
-                for tid in tids:
-                    p_start = obj_tracks[start].get(tid, {}).get(
-                        'position_transformed')
-                    p_end   = obj_tracks[end].get(tid, {}).get(
-                        'position_transformed')
+            for tid in all_tids:
+                if obj not in total_dist:
+                    total_dist[obj] = {}
+                total_dist[obj].setdefault(tid, 0.0)
 
-                    if p_start is None or p_end is None:
+                # Duyệt từng window
+                for start in range(0, n_frames, self.WINDOW):
+                    end = min(start + self.WINDOW, n_frames - 1)
+                    if end == start:
                         continue
 
-                    dist_cm = measure_distance(p_start, p_end)
+                    # Tìm frame đầu tiên và cuối cùng trong window có data
+                    first_fn, last_fn = None, None
+                    for fn in range(start, end + 1):
+                        if tid in obj_tracks[fn] and \
+                           obj_tracks[fn][tid].get('position_transformed') is not None:
+                            if first_fn is None:
+                                first_fn = fn
+                            last_fn = fn
 
-                    # Reject window phi thực tế
+                    # Cần ít nhất 2 frame khác nhau để tính speed
+                    if first_fn is None or last_fn is None or first_fn == last_fn:
+                        continue
+
+                    p_start = obj_tracks[first_fn][tid]['position_transformed']
+                    p_end   = obj_tracks[last_fn][tid]['position_transformed']
+
+                    dist_cm = measure_distance(p_start, p_end)
                     if dist_cm > _MAX_DIST_CM:
                         continue
 
-                    dist_m   = dist_cm * _UNIT_TO_METER
-                    elapsed  = (end - start) / fps
-                    speed_ms = dist_m / elapsed
+                    elapsed  = (last_fn - first_fn) / fps
+                    if elapsed <= 0:
+                        continue
+
+                    speed_ms = (dist_cm * _UNIT_TO_METER) / elapsed
                     speed_kh = min(speed_ms * 3.6, _MAX_SPEED_KMH)
 
-                    if obj not in total_dist:
-                        total_dist[obj] = {}
-                    total_dist[obj][tid] = (
-                        total_dist[obj].get(tid, 0.0) + dist_m)
+                    total_dist[obj][tid] += dist_cm * _UNIT_TO_METER
 
+                    # Ghi speed vào tất cả frame trong window có tid
                     for fn in range(start, end + 1):
                         if tid in obj_tracks[fn]:
                             obj_tracks[fn][tid]['speed']    = speed_kh
-                            obj_tracks[fn][tid]['distance'] = \
-                                total_dist[obj][tid]
+                            obj_tracks[fn][tid]['distance'] = total_dist[obj][tid]
 
     def draw_speed_and_distance(self, frames, tracks):
         for frame_num, frame in enumerate(frames):
