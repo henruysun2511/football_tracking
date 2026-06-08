@@ -16,16 +16,17 @@ import torch
 
 # ─── Config ───
 DEVICE = 0 if torch.cuda.is_available() else "cpu"
-MODEL_PATH = "models/player_detector.pt"
-DATA_YAML  = "datasets/football-players-detection-2/data.yaml"
+ROOT = Path(__file__).resolve().parent.parent
+MODEL_PATH = str(ROOT / "models" / "player_detector.pt")
 CLASSES    = ["ball", "goalkeeper", "player", "referee"]
 COLORS     = ["#e74c3c", "#f39c12", "#2ecc71", "#3498db"]
 OUTPUT_PNG = "analysis/figures/player_training_results.png"
 os.makedirs("analysis/figures", exist_ok=True)
 
 # ─── Fix đường dẫn trong data.yaml (relative → absolute) ───
-base = Path("datasets/football-players-detection-2")
-with open(DATA_YAML) as f:
+ROOT = Path(__file__).resolve().parent.parent
+base = ROOT / "datasets" / "football-players-detection-2"
+with open(base / "data.yaml") as f:
     data_cfg = yaml.safe_load(f)
 
 data_cfg["train"] = str(base / "train" / "images")

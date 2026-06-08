@@ -16,14 +16,14 @@ import torch
 
 # ─── Config ───
 DEVICE = 0 if torch.cuda.is_available() else "cpu"
-MODEL_PATH = "models/pitch_keypoint_detector.pt"
-DATA_YAML  = "datasets/football-field-detection-14/data.yaml"
-OUTPUT_PNG = "analysis/figures/pitch_training_results.png"
-os.makedirs("analysis/figures", exist_ok=True)
+ROOT = Path(__file__).resolve().parent.parent
+MODEL_PATH = str(ROOT / "models" / "pitch_keypoint_detector.pt")
+OUTPUT_PNG = str(ROOT / "analysis" / "figures" / "pitch_training_results.png")
+os.makedirs(str(ROOT / "analysis" / "figures"), exist_ok=True)
 
 # ─── Fix đường dẫn trong data.yaml (relative → absolute) ───
-base = Path("datasets/football-field-detection-14")
-with open(DATA_YAML) as f:
+base = ROOT / "datasets" / "football-field-detection-14"
+with open(base / "data.yaml") as f:
     data_cfg = yaml.safe_load(f)
 
 data_cfg["train"] = str(base / "train" / "images")
