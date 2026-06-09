@@ -29,12 +29,20 @@ if DEVICE == "cpu":
     print("WARNING: Running on CPU — validation may be slow for YOLOv8x @ imgsz=1280")
 
 # ─── Helper ───
-def make_fixed_yaml(base, splits=("train", "val", "test")):
+def make_fixed_yaml(base):
     import yaml
     with open(base / "data.yaml") as f:
         cfg = yaml.safe_load(f)
-    for s in splits:
-        cfg[s] = str(base / s / "images")
+    # Map yaml keys (train/val/test) to actual directory names
+    DIR_MAP = {"train": "train", "val": "valid", "test": "test"}
+    for key, subdir in DIR_MAP.items():
+        if key not in cfg:
+            continue
+        img_dir = base / subdir / "images"
+        if not img_dir.is_dir():
+            img_dir = base / key / "images"
+        if img_dir.is_dir():
+            cfg[key] = str(img_dir)
     fixed = str(base / "_data_fixed.yaml")
     with open(fixed, "w") as f:
         yaml.dump(cfg, f)
@@ -75,7 +83,7 @@ print("-"*71)
 for i, name in enumerate(CLASSES):
     print(f"{'AP@0.5 - ' + name:<25} {pt_ap50[i]:<18.4f} {ft_ap50[i]:<18.4f} {ft_ap50[i] - pt_ap50[i]:<+10.4f}")
 
-os.remove(player_yaml)
+os.remove(player_yaml) if os.path.exists(player_yaml) else None
 
 # =====================================================================
 # 2. Pitch Keypoint Comparison
@@ -105,7 +113,7 @@ print(f"{'Box mAP@0.5:0.95':<25} {box_map50_95:<12.4f}")
 print(f"{'Pose mAP@0.5':<25} {kp_map50:<12.4f}")
 print(f"{'Pose mAP@0.5:0.95':<25} {kp_map50_95:<12.4f}")
 
-os.remove(pitch_yaml)
+os.remove(pitch_yaml) if os.path.exists(pitch_yaml) else None
 
 # =====================================================================
 # 3. Visualization
