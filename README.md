@@ -267,7 +267,7 @@ Các ảnh chụp từ video và biểu đồ phân tích được lưu trong `a
 ![K-Means Team Assignment](analysis/figures/kmeans_team_assignment.png)
 *Phân tách màu áo cầu thủ bằng K-Means clustering để gán đội.*
 
-![Training Results](analysis/figures/training_results.png)
+![Training Results](analysis/figures/evaluate_player_mdeol.png)
 *Biểu đồ huấn luyện: loss, mAP, precision, recall.*
 
 ![Mosaic Augmentation](analysis/figures/mosaic_augmentation.png)
