@@ -46,14 +46,14 @@ results = model.val(data=fixed_yaml, imgsz=640, batch=8, device=DEVICE, plots=Tr
 map50    = float(results.box.map50) if hasattr(results, 'box') and results.box is not None else 0
 map50_95 = float(results.box.map)   if hasattr(results, 'box') and results.box is not None else 0
 
-# Keypoint metrics
-kp_map50    = float(results.keypoint.map50) if hasattr(results, 'keypoint') and results.keypoint is not None else 0
-kp_map50_95 = float(results.keypoint.map)   if hasattr(results, 'keypoint') and results.keypoint is not None else 0
+# Keypoint metrics — model.val() trả về PoseMetrics, có .pose (không phải .keypoint)
+kp_map50    = float(results.pose.map50) if hasattr(results, 'pose') and results.pose is not None else 0
+kp_map50_95 = float(results.pose.map)   if hasattr(results, 'pose') and results.pose is not None else 0
 
 n_kp = 32
-# Ultralytics KeypointMetrics không có ap50 per-keypoint, chỉ có map/map50 tổng
+# results.pose.ap50 là per-class (1 class pitch), không phải per-keypoint
 try:
-    kp_ap50_list = results.keypoint.ap50.tolist()
+    kp_ap50_list = results.pose.ap50.tolist()
 except (AttributeError, TypeError):
     kp_ap50_list = None
 
