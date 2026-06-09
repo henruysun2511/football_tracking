@@ -51,7 +51,11 @@ kp_map50    = float(results.keypoint.map50) if hasattr(results, 'keypoint') and 
 kp_map50_95 = float(results.keypoint.map)   if hasattr(results, 'keypoint') and results.keypoint is not None else 0
 
 n_kp = 32
-kp_ap50_list = results.keypoint.ap50.tolist() if hasattr(results, 'keypoint') and results.keypoint is not None and hasattr(results.keypoint, 'ap50') else [0]*n_kp
+# Ultralytics KeypointMetrics không có ap50 per-keypoint, chỉ có map/map50 tổng
+try:
+    kp_ap50_list = results.keypoint.ap50.tolist()
+except (AttributeError, TypeError):
+    kp_ap50_list = None
 
 # ─── In kết quả ───
 print("\n" + "="*60)
@@ -62,16 +66,17 @@ print(f"  Box   — mAP@0.5:0.95 : {map50_95:.4f}")
 print("-"*60)
 print(f"  Pose  — mAP@0.5      : {kp_map50:.4f}")
 print(f"  Pose  — mAP@0.5:0.95 : {kp_map50_95:.4f}")
-print("-"*60)
-visible_kps = [(i, v) for i, v in enumerate(kp_ap50_list) if v > 0]
-if visible_kps:
-    print(f"  Top 5 keypoint mAP@0.5:")
-    for i, v in sorted(visible_kps, key=lambda x: -x[1])[:5]:
-        print(f"    Keypoint {i:2d}: {v:.4f}")
-    print(f"  Bottom 5 keypoint mAP@0.5:")
-    for i, v in sorted(visible_kps, key=lambda x: x[1])[:5]:
-        print(f"    Keypoint {i:2d}: {v:.4f}")
-print(f"  Số keypoint có dữ liệu: {len(visible_kps)}/{n_kp}")
+if kp_ap50_list is not None:
+    visible_kps = [(i, v) for i, v in enumerate(kp_ap50_list) if v > 0]
+    if visible_kps:
+        print("-"*60)
+        print(f"  Top 5 keypoint mAP@0.5:")
+        for i, v in sorted(visible_kps, key=lambda x: -x[1])[:5]:
+            print(f"    Keypoint {i:2d}: {v:.4f}")
+        print(f"  Bottom 5 keypoint mAP@0.5:")
+        for i, v in sorted(visible_kps, key=lambda x: x[1])[:5]:
+            print(f"    Keypoint {i:2d}: {v:.4f}")
+        print(f"  Số keypoint có dữ liệu: {len(visible_kps)}/{n_kp}")
 print("="*60)
 
 # ─── Vẽ biểu đồ ───
@@ -134,12 +139,18 @@ ax.plot(df["epoch"], df["metrics/recall"], "teal", linestyle="--", label=f"Recal
 ax.set_title("Precision & Recall"); ax.legend(); ax.grid(alpha=0.3)
 ax.set_xlabel("Epoch"); ax.set_ylim(0, 1.05)
 
-# 6. Per-keypoint mAP@0.5 (histogram)
+# 6. Thông tin keypoint hoặc thông báo
 ax = axes[1,2]
-ax.hist(kp_ap50_list, bins=20, color="#8e44ad", edgecolor="white", alpha=0.8)
-ax.axvline(kp_map50, color="red", linestyle="--", linewidth=2, label=f"Mean = {kp_map50:.3f}")
-ax.set_title(f"Phân bố mAP@0.5 của {n_kp} keypoints"); ax.legend(); ax.grid(alpha=0.3)
-ax.set_xlabel("mAP@0.5"); ax.set_ylabel("Số keypoint")
+ax.axis("off")
+if kp_ap50_list is not None:
+    ax.hist(kp_ap50_list, bins=20, color="#8e44ad", edgecolor="white", alpha=0.8)
+    ax.axvline(kp_map50, color="red", linestyle="--", linewidth=2, label=f"Mean = {kp_map50:.3f}")
+    ax.set_title(f"Phân bố mAP@0.5 của {n_kp} keypoints"); ax.legend(); ax.grid(alpha=0.3)
+    ax.set_xlabel("mAP@0.5"); ax.set_ylabel("Số keypoint")
+    ax.set_axis_on()
+else:
+    ax.text(0.1, 0.5, f"KP mAP@0.5 = {kp_map50:.4f}\nKP mAP@0.5:0.95 = {kp_map50_95:.4f}\n\n(Không có per-keypoint data\nfrom Ultralytics KeypointMetrics)",
+            va="center", fontsize=11, fontweight="bold")
 
 plt.tight_layout()
 plt.savefig(OUTPUT_PNG, dpi=150, bbox_inches="tight")
