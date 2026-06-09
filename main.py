@@ -15,18 +15,25 @@ from heatmap_generator.heatmap_generator import HeatmapGenerator
 from minimap.minimap_renderer import MinimapRenderer
 from formations import detect_team_formation
 
+# ==============================================================================
+# 🎯 CẤU HÌNH ĐƯỜNG DẪN CHUẨN TRÊN KAGGLE (ĐÃ ĐỔI TỪ DATASET CỦA BẠN)
+# ==============================================================================
+KAGGLE_DATASET_DIR = '/kaggle/input/datasets/huysun'
+PLAYER_MODEL_PATH = os.path.join(KAGGLE_DATASET_DIR, 'models/player_detector.pt')
+PITCH_KP_MODEL_PATH = os.path.join(KAGGLE_DATASET_DIR, 'models/pitch_keypoint_detector.pt')
+DEFAULT_VIDEO_PATH = os.path.join(KAGGLE_DATASET_DIR, 'input-videos/sample.mp4')
 
-STUB_DIR = 'stubs'
+STUB_DIR = 'stubs'  # Lưu tại /kaggle/working/football_tracking/stubs
 
 
-def phase1_tracking(video_path='input_videos/sample.mp4'):
+def phase1_tracking(video_path=DEFAULT_VIDEO_PATH):
     video_frames = read_video(video_path)
     print(f"Loaded {len(video_frames)} frames from {video_path}")
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 25
     cap.release()
 
-    tracker = Tracker('models/player_detector.pt')
+    tracker = Tracker(PLAYER_MODEL_PATH)  # 🛠️ Đã sửa đường dẫn
     tracks = tracker.get_object_tracks(
         video_frames,
         read_from_stub=True,
@@ -49,8 +56,7 @@ def phase1_tracking(video_path='input_videos/sample.mp4'):
     cam_est.add_adjust_positions_to_tracks(tracks, cam_move)
 
     # 4. Homography dùng position_adjusted
-    kp_detector = PitchKeypointDetector(
-        model_path='models/pitch_keypoint_detector.pt')
+    kp_detector = PitchKeypointDetector(model_path=PITCH_KP_MODEL_PATH)  # 🛠️ Đã sửa đường dẫn
     vt = ViewTransformer(kp_detector)
     vt.add_transformed_position_to_tracks(tracks, video_frames)
 
@@ -104,8 +110,7 @@ def phase2_render(video_frames, tracks, cam_move,
         print("WARNING: No GPU detected, running on CPU")
     tracker = Tracker()
 
-    kp_detector = PitchKeypointDetector(
-        model_path='models/pitch_keypoint_detector.pt')
+    kp_detector = PitchKeypointDetector(model_path=PITCH_KP_MODEL_PATH)  # 🛠️ Đã sửa đường dẫn
     heatmap_gen = HeatmapGenerator(w=630, h=420)
     heatmap_gen.update_from_tracks(tracks)
     minimap_renderer = MinimapRenderer(w=350, h=230)
@@ -221,7 +226,7 @@ def phase2_render(video_frames, tracks, cam_move,
     print("Saved heatmaps to output_videos/")
 
 
-def phase2_render_from_stubs(video_path='input_videos/sample.mp4'):
+def phase2_render_from_stubs(video_path=DEFAULT_VIDEO_PATH):
     with open(f'{STUB_DIR}/tracks_full.pkl', 'rb') as f:
         tracks = pickle.load(f)
     with open(f'{STUB_DIR}/cam_move.pkl', 'rb') as f:
@@ -250,7 +255,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['tracking', 'render', 'all'],
                         default='all')
-    parser.add_argument('--video', default='input_videos/sample.mp4',
+    parser.add_argument('--video', default=DEFAULT_VIDEO_PATH,  # 🛠️ Đã sửa đường dẫn mặc định
                         help='Path to input video')
     args = parser.parse_args()
 
