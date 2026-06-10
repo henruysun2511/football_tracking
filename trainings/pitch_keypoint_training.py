@@ -34,7 +34,7 @@ def main():
 
 
     results = model.train(
-        data=f"{dataset.location}/data.yaml",
+        data=data_yaml_location,
         epochs=100,
         imgsz=640,
         batch=8,            # an toàn hơn với T4
