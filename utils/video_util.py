@@ -18,7 +18,6 @@ def save_video(frames, output_path, fps=24):
     if not frames:
         return
     h, w = frames[0].shape[:2]
-    # Save to temp .avi with no compression (fast)
     tmp = tempfile.NamedTemporaryFile(suffix='.avi', delete=False)
     tmp_path = tmp.name
     tmp.close()

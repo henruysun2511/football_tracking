@@ -67,7 +67,6 @@ class Tracker:
             tracks["referees"].append({})
             tracks["ball"].append({})
 
-            # ByteTrack may return empty tracker_id in some supervision versions
             tid = det_with_tracks.tracker_id
             has_tid = tid is not None and len(tid) == len(det_with_tracks)
 
@@ -133,7 +132,6 @@ class Tracker:
                 
         return player_positions
 
-    # ── Position helpers ─────────────────────────────────────
     def add_position_to_tracks(self, tracks):
         for obj, obj_tracks in tracks.items():
             for frame_num, track in enumerate(obj_tracks):

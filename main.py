@@ -15,9 +15,7 @@ from heatmap_generator.heatmap_generator import HeatmapGenerator
 from minimap.minimap_renderer import MinimapRenderer
 from formations import detect_team_formation
 
-# ==============================================================================
-# 🎯 CẤU HÌNH ĐƯỜNG DẪN CHUẨN TRÊN KAGGLE (ĐÃ ĐỔI TỪ DATASET CỦA BẠN)
-# ==============================================================================
+# CẤU HÌNH ĐƯỜNG DẪN CHUẨN TRÊN KAGGLE 
 KAGGLE_DATASET_DIR = '/kaggle/input/datasets/huysun'
 PLAYER_MODEL_PATH = os.path.join(KAGGLE_DATASET_DIR, 'models/player_detector.pt')
 PITCH_KP_MODEL_PATH = os.path.join(KAGGLE_DATASET_DIR, 'models/pitch_keypoint_detector.pt')
@@ -33,13 +31,12 @@ def phase1_tracking(video_path=DEFAULT_VIDEO_PATH):
     fps = cap.get(cv2.CAP_PROP_FPS) or 25
     cap.release()
 
-    tracker = Tracker(PLAYER_MODEL_PATH)  # 🛠️ Đã sửa đường dẫn
+    tracker = Tracker(PLAYER_MODEL_PATH) 
     tracks = tracker.get_object_tracks(
         video_frames,
         read_from_stub=True,
         stub_path=f'{STUB_DIR}/track_stubs.pkl')
 
-    # ✅ Thứ tự đúng:
     # 1. Interpolate trước để fill gap bbox
     tracks['ball'] = tracker.interpolate_ball_positions(tracks['ball'])
     tracks['players'] = tracker.interpolate_player_positions(tracks['players'])
@@ -255,7 +252,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['tracking', 'render', 'all'],
                         default='all')
-    parser.add_argument('--video', default=DEFAULT_VIDEO_PATH,  # 🛠️ Đã sửa đường dẫn mặc định
+    parser.add_argument('--video', default=DEFAULT_VIDEO_PATH, 
                         help='Path to input video')
     args = parser.parse_args()
 

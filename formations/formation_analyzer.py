@@ -45,18 +45,7 @@ def _classify_player(row, num_lines, line_width):
 
 
 def detect_formation(positions, pitch_length=12000, method='kmeans'):
-    """
-    Detect formation from player positions on pitch.
 
-    Args:
-        positions: list of (x, y) tuples for 10 outfield players
-        pitch_length: length of pitch in model units
-        method: 'kmeans' or 'quantile'
-
-    Returns:
-        tuple: formation key e.g. (4, 3, 3), (4, 2, 3, 1), etc.
-        str: formation name e.g. "4-3-3"
-    """
     if len(positions) < 10:
         # Need all 10 outfield players
         return None, "unknown"
@@ -180,13 +169,12 @@ def _verify_formation(formation):
     formation = tuple(formation)
     s = sum(formation)
     if s != 10:
-        # Distribute surplus/deficit to the most variable line (midfield)
         formation = list(formation)
         diff = 10 - s
         if len(formation) == 3:
-            formation[1] += diff  # adjust midfield
+            formation[1] += diff  
         elif len(formation) == 4:
-            formation[2] += diff  # adjust second midfield line
+            formation[2] += diff  
         formation = tuple(formation)
 
     # Clamp to valid ranges
@@ -205,18 +193,6 @@ def _verify_formation(formation):
 
 
 def detect_team_formation(tracks, team_id, frame_nums=None, method='kmeans'):
-    """
-    Detect formation for a team over specified frames.
-
-    Args:
-        tracks: tracks dict from the pipeline
-        team_id: 1 or 2
-        frame_nums: list of frame indices, or None for all
-        method: 'kmeans' or 'quantile'
-
-    Returns:
-        (formation_tuple, name, conf_score)
-    """
     if frame_nums is None:
         frame_nums = range(len(tracks['players']))
 

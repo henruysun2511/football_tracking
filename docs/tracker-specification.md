@@ -63,6 +63,23 @@ ByteTrack sử dụng Kalman filter để dự đoán vị trí track ở frame 
 | 30–34 | Vòng lặp batch | Chia frames thành các batch nhỏ (mặc định 20 frame/batch). `self.model.predict()` inference từng batch với `conf=0.1` (ngưỡng confidence tối thiểu). Kết quả được append vào list `detections`. |
 | 35 | `return detections` | Trả về list `results` (Ultralytics Results objects) — mỗi phần tử tương ứng một frame. |
 
+**Ví dụ trả về:**
+```python
+>>> detections = tracker.detect_frames(frames[:3])
+>>> len(detections)
+3
+>>> type(detections[0])
+<class 'ultralytics.engine.results.Results'>
+>>> detections[0].boxes.xyxy
+tensor([[8.1200e+02, 4.5600e+02, 9.6300e+02, 8.6400e+02],
+        [2.3400e+02, 3.8900e+02, 3.6700e+02, 7.2100e+02],
+        [4.5000e+02, 4.1200e+02, 5.2300e+02, 8.0500e+02]])
+>>> detections[0].boxes.conf
+tensor([0.8843, 0.7621, 0.6533])
+>>> detections[0].boxes.cls
+tensor([2., 2., 3.])  # 2=player, 3=referee
+```
+
 **`model.predict()` vs `model()`:** `predict()` cho phép truyền tham số như `conf`, `device`; `model()` chỉ inference với tham số mặc định.
 
 ---
@@ -100,6 +117,25 @@ tracks = {
         ...
     ]
 }
+```
+
+**Ví dụ trả về:**
+```python
+>>> tracks = tracker.get_object_tracks(frames[:3])
+>>> tracks.keys()
+dict_keys(['players', 'referees', 'ball'])
+>>> tracks["players"]  # 3 frames
+[{1: {'bbox': [812, 456, 963, 864]}, 2: {'bbox': [234, 389, 367, 721]}},
+ {1: {'bbox': [810, 452, 965, 868]}, 2: {'bbox': [236, 385, 370, 725]}},
+ {1: {'bbox': [815, 460, 960, 862]}}]  # frame 3: mất player ID=2
+>>> tracks["referees"]
+[{3: {'bbox': [450, 412, 523, 805]}},
+ {3: {'bbox': [448, 410, 525, 808]}},
+ {3: {'bbox': [446, 408, 527, 812]}}]
+>>> tracks["ball"]
+[{1: {'bbox': [600, 320, 620, 340]}},
+ {},
+ {1: {'bbox': [605, 315, 625, 335]}}]  # frame giữa không detect được bóng
 ```
 
 #### 5.1.1. Cache check (dòng 40–44)
@@ -162,6 +198,16 @@ Dictionary với 3 key, mỗi key tương ứng một list rỗng sẽ được 
 | 103 | `df = df.interpolate().bfill()` | `interpolate()`: nội suy tuyến tính giữa các giá trị không NaN. `bfill()`: các frame đầu còn NaN được lấp bằng giá trị không NaN đầu tiên (backward fill). |
 | 104 | `return [{1: {"bbox": row}} for row in df.to_numpy().tolist()]` | Chuyển DataFrame về list dict, giữ nguyên cấu trúc tracks ball. |
 
+**Ví dụ trả về:**
+```python
+>>> ball_pos = [{1: {'bbox': [600, 320, 620, 340]}}, {}, {1: {'bbox': [605, 315, 625, 335]}}]
+>>> interp = tracker.interpolate_ball_positions(ball_pos)
+>>> interp  # frame giữa đã được nội suy
+[{1: {'bbox': [600.0, 320.0, 620.0, 340.0]}},
+ {1: {'bbox': [602.5, 317.5, 622.5, 337.5]}},  # linear interpolate
+ {1: {'bbox': [605.0, 315.0, 625.0, 335.0]}}]
+```
+
 ### 6.2. `interpolate_player_positions(self, player_positions)`
 
 **Mục đích:** Nội suy bounding box cho từng player ID riêng biệt.
@@ -174,6 +220,18 @@ Dictionary với 3 key, mỗi key tương ứng một list rỗng sẽ được 
 | 125–126 | DataFrame + interpolate | `pd.DataFrame(bboxes)` → `interpolate(method='linear')`. Không có `bfill()` vì khoảng đã được giới hạn trong [first, last] nên không có leading NaN. |
 | 128–132 | Ghi đè bbox đã nội suy | `bboxes_interpolated[i]` là bbox đã được nội suy (hoặc giá trị gốc nếu không NaN). Ghi vào `player_positions[f][tid]['bbox']`. Nếu frame đó chưa có dict cho tid, tạo mới. |
 | 134 | `return player_positions` | Trả về player_positions đã được cập nhật. |
+
+**Ví dụ trả về:**
+```python
+>>> player_pos = [
+...     {1: {'bbox': [100, 200, 150, 400]}, 2: {'bbox': [500, 300, 560, 500]}},   # frame 0
+...     {1: {'bbox': [102, 202, 152, 402]}},                                        # frame 1: mất ID=2
+...     {1: {'bbox': [106, 206, 156, 406]}, 2: {'bbox': [505, 305, 565, 505]}},   # frame 2: ID=2 xuất hiện lại
+... ]
+>>> interp = tracker.interpolate_player_positions(player_pos)
+>>> interp[1][2]['bbox']  # frame 1, ID=2 đã được nội suy
+[502.5, 302.5, 562.5, 502.5]  # (500+505)/2=502.5, (300+305)/2=302.5, ...
+```
 
 **So sánh interpolation ball vs player:**
 
@@ -199,6 +257,22 @@ Dictionary với 3 key, mỗi key tương ứng một list rỗng sẽ được 
 | 145–146 | Player/Referee: chân | `pos = ((x1+x2)/2, y2)` — trung điểm cạnh đáy của bounding box. Giả định chân cầu thủ luôn ở dưới cùng bbox. |
 | 147 | `tracks[obj][frame_num][tid]['position'] = pos` | Lưu position vào tracks. Key `position` được các module sau sử dụng (camera adjustment, homography, speed/distance). |
 
+**Ví dụ trả về:**
+```python
+>>> tracks = {
+...     "players": [{1: {'bbox': [100, 200, 150, 400]}}],
+...     "ball":    [{1: {'bbox': [600, 320, 620, 340]}}],
+...     "referees": [{3: {'bbox': [450, 412, 523, 805]}}]
+... }
+>>> tracker.add_position_to_tracks(tracks)
+>>> tracks["players"][0][1]['position']
+(125.0, 400.0)    # foot: ((100+150)/2, 400)
+>>> tracks["ball"][0][1]['position']
+(610.0, 330.0)    # center: ((600+620)/2, (320+340)/2)
+>>> tracks["referees"][0][3]['position']
+(486.5, 805.0)    # foot: ((450+523)/2, 805)
+```
+
 ---
 
 ## 8. Draw Annotations (dòng 149–231)
@@ -215,6 +289,8 @@ Dictionary với 3 key, mỗi key tương ứng một list rỗng sẽ được 
 | 160–164 | Vẽ background rect | Rectangle trắng 40×20px, bo tròn, đặt dưới chân để làm nền cho text ID. `y1r = y2 - rect_h//2 + 15`: căn giữa rect dưới ellipse. `color, -1`: fill đầy rect với màu đội. |
 | 165–168 | Vẽ text ID | `cv2.putText` với số ID, font Hershey Simplex 0.6, màu đen, thickness 2. |
 
+**Ví dụ trả về:** Hàm không return (modify frame in-place). Frame đầu vào được vẽ thêm ellipse + ID text.
+
 **Đặc điểm ellipse:** Góc -45° đến 235° (tổng 280°) thay vì 360° để tạo khoảng hở phía trên — tạo cảm giác ellipse "nằm" trên mặt sân.
 
 ### 8.2. `draw_triangle(self, frame, bbox, color)`
@@ -227,6 +303,8 @@ Dictionary với 3 key, mỗi key tương ứng một list rỗng sẽ được 
 | 174–176 | `np.array([[xc, y1], [xc-10, y1-20], [xc+10, y1-20]])` | Ba đỉnh tạo tam giác cân hướng lên: đỉnh dưới tại `(xc, y1)`, hai đỉnh trên cách nhau 20px. |
 | 177 | `cv2.drawContours(frame, [pts], 0, color, -1)` | Vẽ tam giác filled với màu `color`. `-1` = fill. |
 | 178 | `cv2.drawContours(frame, [pts], 0, (0,0,0), 2)` | Vẽ viền đen cho tam giác (outline), độ dày 2px. |
+
+**Ví dụ trả về:** Hàm không return (modify frame in-place). Frame đầu vào được vẽ thêm tam giác filled + outline đen.
 
 **Kỹ thuật outline 2 lớp:** Fill trước → viền đen sau. Tạo hiệu ứng viền đen bao quanh tam giác màu, giúp tam giác nổi bật trên mọi nền.
 
@@ -241,6 +319,8 @@ Dictionary với 3 key, mỗi key tương ứng một list rỗng sẽ được 
 | 189–191 | Tính % | `team1` / `team2`: đếm số frame đội 1/2 có bóng từ đầu đến frame hiện tại. `total += 1e-6` tránh chia 0. |
 | 194–201 | Vẽ text | "Team 1: xx%" màu xanh dương `(255,0,0)` và "Team 2: xx%" màu đỏ `(0,0,255)` ở góc phải dưới. Font size 1, thickness 3. |
 
+**Ví dụ trả về:** Hàm không return (modify frame in-place). Góc phải dưới frame hiển thị `Team 1: 63%` (xanh) và `Team 2: 37%` (đỏ). |
+
 ### 8.4. `draw_annotations(self, video_frames, tracks, team_ball_control)`
 
 **Mục đích:** Vẽ toàn bộ annotation lên tất cả frame — hàm tổng hợp cho pipeline đơn giản.
@@ -253,6 +333,17 @@ Dictionary với 3 key, mỗi key tương ứng một list rỗng sẽ được 
 | 223–226 | Vẽ bóng | Triangle màu cyan `(0,255,255)`. |
 | 228–229 | Vẽ ball control | Gọi `draw_team_ball_control()` để vẽ overlay %. |
 | 230–231 | Append + return | Append frame đã annotate vào list output. |
+
+**Ví dụ trả về:**
+```python
+>>> annotated = tracker.draw_annotations(frames[:3], tracks, team_ball_control)
+>>> len(annotated)
+3
+>>> annotated[0].shape  # giữ nguyên kích thước frame gốc
+(1080, 1920, 3)
+>>> type(annotated[0])
+<class 'numpy.ndarray'>  # mỗi frame là ảnh BGR đã vẽ annotation
+```
 
 ---
 
