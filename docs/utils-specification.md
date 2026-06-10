@@ -36,11 +36,34 @@ Cả hai file đều là stateless — chỉ chứa hàm thuần túy (pure func
 | 14 | `cap.release()` | Giải phóng bộ nhớ OpenCV (quan trọng: nếu không release, file video bị lock trên Windows). |
 | 15 | `return frames` | Trả về list frame. Kích thước bộ nhớ ≈ H × W × 3 × số_frame bytes. Ví dụ: video 640×480, 1000 frame ≈ 900 MB. |
 
+**Ví dụ trả về:**
+```python
+>>> frames = read_video("sample.mp4")
+>>> type(frames)
+list
+>>> len(frames)
+450
+>>> frames[0].shape
+(720, 1280, 3)
+>>> frames[0].dtype
+dtype('uint8')
+```
+
 **Lưu ý hiệu năng:** `read_video()` load toàn bộ video vào RAM. Với video dài (> 10 phút), dung lượng có thể vượt quá RAM khả dụng. Pipeline hiện tại không hỗ trợ streaming.
 
 ### 2.3. `save_video(frames, output_path, fps=24)` (dòng 17–45)
 
 **Mục đích:** Ghi list frame ra file video với codec H.264 (ưu tiên) hoặc MP4V (fallback).
+
+**Ví dụ sử dụng:**
+```python
+>>> save_video(frames, "output.mp4", fps=30)
+# Không trả về (None). File output.mp4 được tạo.
+>>> import os; os.path.exists("output.mp4")
+True
+>>> os.path.getsize("output.mp4")
+5_238_471  # ~5 MB cho 15 giây video 720p
+```
 
 | Dòng | Lệnh | Giải thích |
 |------|------|------------|
@@ -85,6 +108,14 @@ frames → OpenCV MJPG (.avi tạm) → FFmpeg H.264 (.mp4)
 | 2 | `x1, y1, x2, y2 = bbox` | Unpack list 4 phần tử thành 4 biến. bbox format: `[x_trái, y_trên, x_phải, y_dưới]`. |
 | 3 | `return int((x1 + x2) / 2), int((y1 + y2) / 2)` | Tọa độ tâm: trung bình cộng x1+x2 và y1+y2. `int()` ép về số nguyên pixel. |
 
+**Ví dụ trả về:**
+```python
+>>> get_center([100, 200, 300, 400])
+(200, 300)
+>>> get_center([0, 0, 50, 100])
+(25, 50)
+```
+
 **Công thức:** `center = ((x1+x2)/2, (y1+y2)/2)`
 
 **Sử dụng trong pipeline:** Tính vị trí bóng (bóng được đại diện bằng tâm bbox).
@@ -97,6 +128,14 @@ frames → OpenCV MJPG (.avi tạm) → FFmpeg H.264 (.mp4)
 |------|------|------------|
 | 6 | `return bbox[2] - bbox[0]` | `x2 - x1` = chiều rộng tính bằng pixel. |
 
+**Ví dụ trả về:**
+```python
+>>> get_bbox_width([100, 200, 300, 400])
+200
+>>> get_bbox_width([50, 50, 80, 120])
+30
+```
+
 **Sử dụng trong pipeline:** `tracker.draw_ellipse()` dùng width để xác định kích thước ellipse dưới chân cầu thủ (`axes=(w, int(0.35*w))`).
 
 ### 3.3. `get_foot_position(bbox)` (dòng 8–10)
@@ -107,6 +146,14 @@ frames → OpenCV MJPG (.avi tạm) → FFmpeg H.264 (.mp4)
 |------|------|------------|
 | 9 | `x1, y1, x2, y2 = bbox` | Unpack bbox. |
 | 10 | `return int((x1 + x2) / 2), int(y2)` | `x` = trung điểm chiều ngang, `y` = cạnh dưới của bbox. Giả định: chân cầu thủ luôn ở dưới cùng bounding box. |
+
+**Ví dụ trả về:**
+```python
+>>> get_foot_position([100, 200, 300, 500])
+(200, 500)
+>>> get_foot_position([400, 300, 500, 600])
+(450, 600)
+```
 
 **Công thức:** `foot_position = ((x1+x2)/2, y2)`
 
@@ -131,6 +178,16 @@ frames → OpenCV MJPG (.avi tạm) → FFmpeg H.264 (.mp4)
 |------|------|------------|
 | 13 | `return ((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2) ** 0.5` | Công thức Euclidean: `√[(x₁−x₂)² + (y₁−y₂)²]`. `**0.5` thay cho `math.sqrt()`. Trả về float. |
 
+**Ví dụ trả về:**
+```python
+>>> measure_distance((0, 0), (3, 4))
+5.0
+>>> measure_distance((100, 200), (150, 220))
+53.85164807134504
+>>> measure_distance((10, 10), (10, 10))
+0.0
+```
+
 **Công thức:** `distance = √((x₁−x₂)² + (y₁−y₂)²)`
 
 **Sử dụng trong pipeline:** `PlayerBallAssigner.assign_ball_to_player()` tính khoảng cách từ bóng đến từng player để tìm player gần nhất.
@@ -142,6 +199,16 @@ frames → OpenCV MJPG (.avi tạm) → FFmpeg H.264 (.mp4)
 | Dòng | Lệnh | Giải thích |
 |------|------|------------|
 | 16 | `return p1[0]-p2[0], p1[1]-p2[1]` | Trả về tuple `(dx, dy)`. Giá trị âm/dương tùy vị trí tương đối. |
+
+**Ví dụ trả về:**
+```python
+>>> measure_xy_distance((10, 20), (3, 5))
+(7, 15)
+>>> measure_xy_distance((100, 200), (150, 220))
+(-50, -20)
+>>> measure_xy_distance((50, 50), (50, 50))
+(0, 0)
+```
 
 **Sử dụng trong pipeline:** `CameraMovementEstimator` dùng `measure_xy_distance()` (trong `estimators/camera_movement_estimator.py`) để tính độ dịch chuyển camera giữa hai frame liên tiếp.
 
@@ -158,13 +225,13 @@ frames → OpenCV MJPG (.avi tạm) → FFmpeg H.264 (.mp4)
 
 ### 4.2. bbox_util.py
 
-| Hàm | Input | Output | Công thức |
-|-----|-------|--------|-----------|
-| `get_center(bbox)` | `[x1,y1,x2,y2]` | `(cx, cy)` | `((x1+x2)/2, (y1+y2)/2)` |
-| `get_bbox_width(bbox)` | `[x1,y1,x2,y2]` | `w: int` | `x2 - x1` |
-| `get_foot_position(bbox)` | `[x1,y1,x2,y2]` | `(cx, y2)` | `((x1+x2)/2, y2)` |
-| `measure_distance(p1, p2)` | `(x1,y1), (x2,y2)` | `d: float` | `√(Δx² + Δy²)` |
-| `measure_xy_distance(p1, p2)` | `(x1,y1), (x2,y2)` | `(dx, dy)` | `(x1−x2, y1−y2)` |
+| Hàm | Input | Output | Ví dụ |
+|-----|-------|--------|-------|
+| `get_center(bbox)` | `[x1,y1,x2,y2]` | `(cx, cy)` | `get_center([0,0,2,2])` → `(1, 1)` |
+| `get_bbox_width(bbox)` | `[x1,y1,x2,y2]` | `w: int` | `get_bbox_width([10,0,50,100])` → `40` |
+| `get_foot_position(bbox)` | `[x1,y1,x2,y2]` | `(cx, y2)` | `get_foot_position([0,0,100,200])` → `(50, 200)` |
+| `measure_distance(p1, p2)` | `(x1,y1), (x2,y2)` | `d: float` | `measure_distance((0,0), (3,4))` → `5.0` |
+| `measure_xy_distance(p1, p2)` | `(x1,y1), (x2,y2)` | `(dx, dy)` | `measure_xy_distance((5,8), (2,3))` → `(3, 5)` |
 
 ---
 
