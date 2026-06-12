@@ -21,7 +21,7 @@ PLAYER_MODEL_PATH = os.path.join(KAGGLE_DATASET_DIR, 'models/player_detector.pt'
 PITCH_KP_MODEL_PATH = os.path.join(KAGGLE_DATASET_DIR, 'models/pitch_keypoint_detector.pt')
 DEFAULT_VIDEO_PATH = os.path.join(KAGGLE_DATASET_DIR, 'input-videos/sample.mp4')
 
-STUB_DIR = 'stubs'  # Lưu tại /kaggle/working/football_tracking/stubs
+STUB_DIR = 'stubs' 
 
 
 def phase1_tracking(video_path=DEFAULT_VIDEO_PATH):
@@ -53,7 +53,7 @@ def phase1_tracking(video_path=DEFAULT_VIDEO_PATH):
     cam_est.add_adjust_positions_to_tracks(tracks, cam_move)
 
     # 4. Homography dùng position_adjusted
-    kp_detector = PitchKeypointDetector(model_path=PITCH_KP_MODEL_PATH)  # 🛠️ Đã sửa đường dẫn
+    kp_detector = PitchKeypointDetector(model_path=PITCH_KP_MODEL_PATH)  
     vt = ViewTransformer(kp_detector)
     vt.add_transformed_position_to_tracks(tracks, video_frames)
 
@@ -107,7 +107,7 @@ def phase2_render(video_frames, tracks, cam_move,
         print("WARNING: No GPU detected, running on CPU")
     tracker = Tracker()
 
-    kp_detector = PitchKeypointDetector(model_path=PITCH_KP_MODEL_PATH)  # 🛠️ Đã sửa đường dẫn
+    kp_detector = PitchKeypointDetector(model_path=PITCH_KP_MODEL_PATH) 
     heatmap_gen = HeatmapGenerator(w=630, h=420)
     heatmap_gen.update_from_tracks(tracks)
     minimap_renderer = MinimapRenderer(w=350, h=230)

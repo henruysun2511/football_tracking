@@ -32,7 +32,7 @@ KNOWN_FORMATIONS = {
 
 
 def _normalize_direction(positions, pitch_length):
-    """Flip x so defenders are at low x, forwards at high x."""
+    """Lật x sao cho hậu vệ ở x thấp, tiền đạo ở x cao."""
     mean_x = np.mean([p[0] for p in positions])
     if mean_x > pitch_length / 2:
         return [(pitch_length - p[0], p[1]) for p in positions]
@@ -40,20 +40,15 @@ def _normalize_direction(positions, pitch_length):
 
 
 def _classify_player(row, num_lines, line_width):
-    """Classify a player's position index into a line (0=def, 1=mid, 2=fwd)."""
     return min(int(row * num_lines / line_width), num_lines - 1)
 
 
 def detect_formation(positions, pitch_length=12000, method='kmeans'):
-
     if len(positions) < 10:
-        # Need all 10 outfield players
         return None, "unknown"
 
-    # Normalize direction: defenders at low x, forwards at high x
     norm = _normalize_direction(positions, pitch_length)
 
-    # Sort by x (defensive to offensive)
     sorted_pos = sorted(norm, key=lambda p: p[0])
     xs = np.array([p[0] for p in sorted_pos])
 
@@ -64,7 +59,6 @@ def detect_formation(positions, pitch_length=12000, method='kmeans'):
 
 
 def _cluster_lines_kmeans(xs, n_clusters=3):
-    """1D k-means clustering for line detection."""
     if _HAS_SKLEARN:
         km = KMeans(n_clusters=n_clusters, random_state=0, n_init=5)
         labels = km.fit_predict(xs.reshape(-1, 1))
@@ -73,12 +67,10 @@ def _cluster_lines_kmeans(xs, n_clusters=3):
 
 
 def _cluster_lines_simple(xs, n_clusters=3):
-    """Simple threshold-based clustering as k-means fallback."""
     sorted_xs = np.sort(xs)
     n = len(sorted_xs)
 
     if n_clusters == 3:
-        # Split into 3 equal-ish groups
         d1 = n // 3
         d2 = 2 * n // 3
         thresh1 = (sorted_xs[d1 - 1] + sorted_xs[d1]) / 2 if d1 < n else sorted_xs[-1]
@@ -104,36 +96,36 @@ def _cluster_lines_simple(xs, n_clusters=3):
 
 
 def _detect_kmeans(xs, sorted_pos):
-    """Detect formation using k-means clustering into lines."""
-    # Try 3-line formation first (def-mid-fwd)
+    """Phát hiện đội hình bằng k-means clustering thành các tuyến."""
+    # Thử đội hình 3 tuyến trước (hậu vệ - tiền vệ - tiền đạo)
     labels_3, centers_3 = _cluster_lines_kmeans(xs, 3)
     counts_3 = [int((labels_3 == i).sum()) for i in range(3)]
-    # Sort by center position (def=0, mid=1, fwd=2)
+    # Sắp xếp theo vị trí center (hậu vệ=0, tiền vệ=1, tiền đạo=2)
     order_3 = np.argsort(centers_3) if centers_3 is not None else [0, 1, 2]
     def_cnt = counts_3[order_3[0]]
     mid_cnt = counts_3[order_3[1]]
     fwd_cnt = counts_3[order_3[2]]
 
-    # Check if formation has 4 lines (like 4-2-3-1, 4-1-4-1)
-    # The mid line split into 2 would have a clear gap
+    # Kiểm tra nếu đội hình có 4 tuyến (vd 4-2-3-1, 4-1-4-1)
+    # Tuyến tiền vệ tách làm 2 sẽ có gap rõ rệt
     labels_4, centers_4 = _cluster_lines_kmeans(xs, 4)
     counts_4 = [int((labels_4 == i).sum()) for i in range(4)]
     order_4 = np.argsort(centers_4) if centers_4 is not None else [0, 1, 2, 3]
-    g1 = counts_4[order_4[0]]  # def
-    g2 = counts_4[order_4[1]]  # def-mid or mid
-    g3 = counts_4[order_4[2]]  # mid-fwd or mid
-    g4 = counts_4[order_4[3]]  # fwd
+    g1 = counts_4[order_4[0]]  # hậu vệ
+    g2 = counts_4[order_4[1]]  # hậu vệ-tiền vệ hoặc tiền vệ
+    g3 = counts_4[order_4[2]]  # tiền vệ-tiền đạo hoặc tiền vệ
+    g4 = counts_4[order_4[3]]  # tiền đạo
 
-    # Decide if 3-line or 4-line formation fits better
-    # 4-line formations have 2 mids lines summing to ~4
+    # Quyết định đội hình 3 hay 4 tuyến
+    # Đội hình 4 tuyến có 2 tuyến tiền vệ tổng ~4
     mid2_sum = g2 + g3
     if (min(g2, g3) >= 1 and 3 <= mid2_sum <= 5 and
             g1 + g2 + g3 + g4 == 10):
         formation = (g1, g2, g3, g4)
     else:
         formation = (def_cnt, mid_cnt, fwd_cnt)
-        # If def+mid+fwd != 10, last player gets pushed to nearest line
-        # This shouldn't happen with proper clustering
+        # Nếu hvf+tv+tđ != 10, cầu thủ cuối bị đẩy về tuyến gần nhất
+        # Trường hợp này không xảy ra nếu clustering đúng
 
     formation = _verify_formation(formation)
     name = KNOWN_FORMATIONS.get(formation, "-".join(str(c) for c in formation))
@@ -141,17 +133,17 @@ def _detect_kmeans(xs, sorted_pos):
 
 
 def _detect_quantile(xs, sorted_pos):
-    """Detect formation using percentile-based approach."""
+    """Phát hiện đội hình dùng phương pháp phân vị."""
     total = len(xs)
-    # Split into 3 lines using x position percentiles
-    # Defenders: bottom 30-40% x, Midfielders: middle 30-40%, Forwards: top 30-40%
-    # Use gaps between players to find natural splits
+    # Chia thành 3 tuyến dùng percentiles của tọa độ x
+    # Hậu vệ: 30-40% x thấp nhất, Tiền vệ: 30-40% giữa, Tiền đạo: 30-40% cao nhất
+    # Dùng khoảng cách giữa các cầu thủ để tìm split tự nhiên
 
-    # Find largest gaps between consecutive players (sorted by x)
+    # Tìm các gap lớn nhất giữa các cầu thủ liên tiếp (sắp xếp theo x)
     gaps = [(xs[i + 1] - xs[i], i) for i in range(total - 1)]
     gaps.sort(reverse=True)
 
-    # Top 2 gaps define the 3 lines
+    # 2 gap lớn nhất định nghĩa 3 tuyến
     gap_indices = sorted([g[1] for g in gaps[:2]])
 
     def_cnt = gap_indices[0] + 1
@@ -165,7 +157,7 @@ def _detect_quantile(xs, sorted_pos):
 
 
 def _verify_formation(formation):
-    """Verify formation sums to 10 and adjust if needed."""
+    """Kiểm tra tổng đội hình = 10 và điều chỉnh nếu cần."""
     formation = tuple(formation)
     s = sum(formation)
     if s != 10:
@@ -177,11 +169,11 @@ def _verify_formation(formation):
             formation[2] += diff  
         formation = tuple(formation)
 
-    # Clamp to valid ranges
+    # Kẹp trong khoảng hợp lệ
     clamped = []
     for c in formation:
         clamped.append(max(1, min(6, c)))
-    # Re-adjust sum
+    # Điều chỉnh lại tổng
     s2 = sum(clamped)
     while s2 != 10:
         if s2 < 10:
@@ -205,16 +197,14 @@ def detect_team_formation(tracks, team_id, frame_nums=None, method='kmeans'):
                 if pos is not None:
                     frame_players.append(pos)
         if len(frame_players) >= 10:
-            # Take only the 10 outfield players (exclude GK)
-            # GK should be the deepest player (min or max x depending on direction)
+            # Chỉ lấy 10 cầu thủ sân (loại thủ môn)
             sorted_by_x = sorted(frame_players, key=lambda p: p[0])
-            outfield = sorted_by_x[1:]  # Remove deepest = likely GK
+            outfield = sorted_by_x[1:] 
             detections.append(outfield)
 
     if not detections:
         return None, "unknown", 0.0
 
-    # Accumulate votes for each frame
     formation_votes = Counter()
     for positions in detections:
         if len(positions) == 10:
